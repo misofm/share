@@ -23,7 +23,7 @@ Pin to a full commit SHA (never a branch):
 
 ```toml
 [dependencies]
-miso_share = { git = "https://github.com/misonetwork/share.git", rev = "<commit-sha>" }
+miso_share = { git = "https://github.com/misofm/share.git", rev = "<commit-sha>" }
 ```
 
 ## Usage
