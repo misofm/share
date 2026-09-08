@@ -1,10 +1,10 @@
-# Security Audit — `miso_share`
+# Security Audit — `share`
 
 **Revision:** working tree @ `d67ff8c` (`main`) · **Date:** 2026-08-22 ·
 **Toolchain:** sui 1.77.2 · **Framework:** pinned rev
 `06734f6ff0af45d8632a14a4dc4b100197f6b1a2`
 
-Audit of `miso_share`, the fixed-supply share issuance package that is the
+Audit of `share`, the fixed-supply share issuance package that is the
 economic root of the ecosystem: every share supply (10,000,000.000000 tokens,
 6 decimals, permanently fixed, freeze-proof) passes through
 `share::initialize`. Verdict: **safe to publish — no exploitable findings.**

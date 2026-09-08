@@ -5,7 +5,7 @@
 
 > A [Sui Move](https://docs.sui.io/concepts/sui-move-concepts) package for fixed-supply currency issuance, designed for representing equity-like ownership stakes.
 
-`miso_share::share::initialize` mints exactly **10,000,000.000000** tokens (6 decimals) and makes the supply immutable. It enforces a set of structural invariants at initialization to guarantee the resulting token is well-formed, tamper-proof, and freeze-proof:
+`share::share::initialize` mints exactly **10,000,000.000000** tokens (6 decimals) and makes the supply immutable. It enforces a set of structural invariants at initialization to guarantee the resulting token is well-formed, tamper-proof, and freeze-proof:
 
 - The type parameter must be `<address>::share::Share`
 - The currency's `MetadataCap` must already be deleted (metadata is frozen)
@@ -23,7 +23,7 @@ Pin to a full commit SHA (never a branch):
 
 ```toml
 [dependencies]
-miso_share = { git = "https://github.com/misofm/share.git", rev = "<commit-sha>" }
+share = { git = "https://github.com/misofm/share.git", rev = "<commit-sha>" }
 ```
 
 ## Usage
@@ -34,7 +34,7 @@ miso_share = { git = "https://github.com/misofm/share.git", rev = "<commit-sha>"
    `share`).
 2. Create a currency with `sui::coin_registry::new_currency`.
 3. Set any desired metadata (name, symbol, icon, description), then call `finalize_and_delete_metadata_cap` to freeze it.
-4. Call `miso_share::share::initialize` with the currency and its canonical
+4. Call `share::share::initialize` with the currency and its canonical
    treasury cap (the one created together with the currency).
 5. Distribute the returned `Balance<Share>` to shareholders.
 

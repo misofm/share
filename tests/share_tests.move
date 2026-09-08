@@ -6,11 +6,11 @@
 /// and the `::share::Share` type-suffix gate decides what counts as a share
 /// type. Covers the happy path, all four abort gates, and the suffix matrix.
 #[test_only]
-module miso_share::share_tests;
+module share::share_tests;
 
-use miso_share::legacyotw;
-use miso_share::notshare;
-use miso_share::share::{Self, Share, Shares, ShareInitializedEvent};
+use share::legacyotw;
+use share::notshare;
+use share::share::{Self, Share, Shares, ShareInitializedEvent};
 use std::unit_test::{assert_eq, destroy};
 
 /// 10,000,000.000000 tokens at 6 decimals — must match share::SUPPLY.

@@ -6,7 +6,7 @@
 /// cap ID — the property `share::initialize`'s canonical-cap assert relies on
 /// to reject them.
 #[test_only]
-module miso_share::legacyotw;
+module share::legacyotw;
 
 public struct LEGACYOTW has drop {}
 

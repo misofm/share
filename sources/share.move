@@ -8,10 +8,10 @@
 /// 1. Create a package with a `share` module containing a `Share` type
 /// 2. Create a currency with `sui::coin_registry::new_currency`
 /// 3. Delete the metadata cap via `finalize_and_delete_metadata_cap`
-/// 4. Call `miso_share::share::initialize` with the currency and its canonical
+/// 4. Call `share::share::initialize` with the currency and its canonical
 ///    treasury cap (the one created together with the currency)
 /// 5. Distribute the returned balance to shareholders
-module miso_share::share;
+module share::share;
 
 use std::type_name::{TypeName, with_defining_ids};
 use sui::balance::Balance;

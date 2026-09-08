@@ -5,7 +5,7 @@
 /// type-suffix gate. Has its own currency helper because
 /// `coin_registry::new_currency<T>` must be called from T's defining module.
 #[test_only]
-module miso_share::notshare;
+module share::notshare;
 
 use sui::coin::TreasuryCap;
 use sui::coin_registry::{Self, Currency, MetadataCap};
