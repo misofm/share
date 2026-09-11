@@ -50,10 +50,17 @@ const ETreasuryCapMismatch: u64 = 5;
 
 // === Events ===
 
-public struct ShareInitializedEvent has copy, drop {
-    share_type: TypeName,
+public struct ShareInitializedEvent<phantom ShareType> has copy, drop {
+    currency_id: object::ID,
+    treasury_cap_id: object::ID,
+    share_type: vector<u8>,
     decimals: u8,
     supply: u64,
+    supply_fixed: bool,
+    name: vector<u8>,
+    symbol: vector<u8>,
+    description: vector<u8>,
+    icon_url: vector<u8>,
 }
 
 // === Public Functions ===
@@ -98,16 +105,34 @@ public fun initialize<Share>(
     // Assert the currency has no existing supply.
     assert!(treasury_cap.supply().value() == 0, ENotZeroSupply);
 
+    // Capture identifiers before consuming the treasury cap below. These are
+    // read-only observations used only to make the initialization event
+    // self-contained for indexers.
+    let currency_id = object::id(currency);
+    let treasury_cap_id = object::id(&treasury_cap);
+    let share_type = bcs::to_bytes(&with_defining_ids<Share>());
+    let name = std::string::into_bytes(currency.name());
+    let symbol = std::string::into_bytes(currency.symbol());
+    let description = std::string::into_bytes(currency.description());
+    let icon_url = std::string::into_bytes(currency.icon_url());
+
     // Mint the share balance.
     let balance = treasury_cap.mint_balance(SUPPLY);
 
     // Make the supply fixed.
     currency.make_supply_fixed(treasury_cap);
 
-    emit(ShareInitializedEvent {
-        share_type: with_defining_ids<Share>(),
+    emit(ShareInitializedEvent<Share> {
+        currency_id,
+        treasury_cap_id,
+        share_type,
         decimals: DECIMALS,
         supply: SUPPLY,
+        supply_fixed: currency.is_supply_fixed(),
+        name,
+        symbol,
+        description,
+        icon_url,
     });
 
     balance
@@ -221,4 +246,33 @@ public fun new_regulated_share_currency_for_testing(
     let (currency, metadata_cap) = coin_registry::finalize_unwrap_for_testing(initializer, ctx);
     std::unit_test::destroy(registry);
     (currency, treasury_cap, metadata_cap, deny_cap)
+}
+
+#[test_only]
+public fun initialized_event_fields<ShareType>(
+    event: &ShareInitializedEvent<ShareType>,
+): (
+    object::ID,
+    object::ID,
+    vector<u8>,
+    u8,
+    u64,
+    bool,
+    vector<u8>,
+    vector<u8>,
+    vector<u8>,
+    vector<u8>,
+) {
+    (
+        event.currency_id,
+        event.treasury_cap_id,
+        event.share_type,
+        event.decimals,
+        event.supply,
+        event.supply_fixed,
+        event.name,
+        event.symbol,
+        event.description,
+        event.icon_url,
+    )
 }

@@ -12,6 +12,8 @@ use share::legacyotw;
 use share::notshare;
 use share::share::{Self, Share, Shares, ShareInitializedEvent};
 use std::unit_test::{assert_eq, destroy};
+use std::type_name::with_defining_ids;
+use sui::bcs;
 
 /// 10,000,000.000000 tokens at 6 decimals — must match share::SUPPLY.
 const SUPPLY: u64 = 10_000_000_000_000;
@@ -29,6 +31,8 @@ fun initialize_mints_fixed_supply() {
     let ctx = &mut tx_context::dummy();
     let (mut currency, treasury_cap, metadata_cap) =
         share::new_share_currency_for_testing(6, ctx);
+    let currency_id = sui::object::id(&currency);
+    let treasury_cap_id = sui::object::id(&treasury_cap);
     currency.delete_metadata_cap(metadata_cap);
 
     let balance = share::initialize<Share>(&mut currency, treasury_cap);
@@ -38,7 +42,30 @@ fun initialize_mints_fixed_supply() {
     assert_eq!(balance.value(), SUPPLY);
     assert!(currency.is_supply_fixed());
     assert_eq!(currency.total_supply(), option::some(SUPPLY));
-    assert_eq!(sui::event::events_by_type<ShareInitializedEvent>().length(), 1);
+    let events = sui::event::events_by_type<ShareInitializedEvent<Share>>();
+    assert_eq!(events.length(), 1);
+    let (
+        event_currency_id,
+        event_treasury_cap_id,
+        event_share_type,
+        event_decimals,
+        event_supply,
+        event_supply_fixed,
+        event_name,
+        event_symbol,
+        event_description,
+        event_icon_url,
+    ) = share::initialized_event_fields(&events[0]);
+    assert_eq!(event_currency_id, currency_id);
+    assert_eq!(event_treasury_cap_id, treasury_cap_id);
+    assert_eq!(event_share_type, bcs::to_bytes(&with_defining_ids<Share>()));
+    assert_eq!(event_decimals, 6);
+    assert_eq!(event_supply, SUPPLY);
+    assert!(event_supply_fixed);
+    assert_eq!(event_name, b"Share");
+    assert_eq!(event_symbol, b"SHR");
+    assert_eq!(event_description, b"");
+    assert_eq!(event_icon_url, b"");
 
     destroy(balance);
     destroy(currency);
