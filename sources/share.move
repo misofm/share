@@ -51,12 +51,14 @@ const ETreasuryCapMismatch: u64 = 5;
 // === Events ===
 
 public struct ShareInitializedEvent<phantom ShareType> has copy, drop {
-    currency_id: object::ID,
-    treasury_cap_id: object::ID,
+    currency_id: address,
+    treasury_cap_id: address,
     share_type: vector<u8>,
     decimals: u8,
     supply: u64,
-    supply_fixed: bool,
+    fixed_supply: bool,
+    metadata_cap_deleted: bool,
+    regulated: bool,
     name: vector<u8>,
     symbol: vector<u8>,
     description: vector<u8>,
@@ -108,9 +110,9 @@ public fun initialize<Share>(
     // Capture identifiers before consuming the treasury cap below. These are
     // read-only observations used only to make the initialization event
     // self-contained for indexers.
-    let currency_id = object::id(currency);
-    let treasury_cap_id = object::id(&treasury_cap);
-    let share_type = bcs::to_bytes(&with_defining_ids<Share>());
+    let currency_id = object::id_address(currency);
+    let treasury_cap_id = object::id_address(&treasury_cap);
+    let share_type = with_defining_ids<Share>().into_string().into_bytes();
     let name = std::string::into_bytes(currency.name());
     let symbol = std::string::into_bytes(currency.symbol());
     let description = std::string::into_bytes(currency.description());
@@ -128,7 +130,9 @@ public fun initialize<Share>(
         share_type,
         decimals: DECIMALS,
         supply: SUPPLY,
-        supply_fixed: currency.is_supply_fixed(),
+        fixed_supply: currency.is_supply_fixed(),
+        metadata_cap_deleted: currency.is_metadata_cap_deleted(),
+        regulated: currency.is_regulated(),
         name,
         symbol,
         description,
@@ -252,11 +256,13 @@ public fun new_regulated_share_currency_for_testing(
 public fun initialized_event_fields<ShareType>(
     event: &ShareInitializedEvent<ShareType>,
 ): (
-    object::ID,
-    object::ID,
+    address,
+    address,
     vector<u8>,
     u8,
     u64,
+    bool,
+    bool,
     bool,
     vector<u8>,
     vector<u8>,
@@ -269,7 +275,9 @@ public fun initialized_event_fields<ShareType>(
         event.share_type,
         event.decimals,
         event.supply,
-        event.supply_fixed,
+        event.fixed_supply,
+        event.metadata_cap_deleted,
+        event.regulated,
         event.name,
         event.symbol,
         event.description,

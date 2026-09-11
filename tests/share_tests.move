@@ -13,7 +13,6 @@ use share::notshare;
 use share::share::{Self, Share, Shares, ShareInitializedEvent};
 use std::unit_test::{assert_eq, destroy};
 use std::type_name::with_defining_ids;
-use sui::bcs;
 
 /// 10,000,000.000000 tokens at 6 decimals — must match share::SUPPLY.
 const SUPPLY: u64 = 10_000_000_000_000;
@@ -31,8 +30,10 @@ fun initialize_mints_fixed_supply() {
     let ctx = &mut tx_context::dummy();
     let (mut currency, treasury_cap, metadata_cap) =
         share::new_share_currency_for_testing(6, ctx);
-    let currency_id = sui::object::id(&currency);
-    let treasury_cap_id = sui::object::id(&treasury_cap);
+    let currency_id = sui::object::id_address(&currency);
+    let treasury_cap_id = sui::object::id_address(&treasury_cap);
+    currency.set_description(&metadata_cap, b"A distinct description".to_string());
+    currency.set_icon_url(&metadata_cap, b"https://example.com/icon.png".to_string());
     currency.delete_metadata_cap(metadata_cap);
 
     let balance = share::initialize<Share>(&mut currency, treasury_cap);
@@ -50,7 +51,9 @@ fun initialize_mints_fixed_supply() {
         event_share_type,
         event_decimals,
         event_supply,
-        event_supply_fixed,
+        event_fixed_supply,
+        event_metadata_cap_deleted,
+        event_regulated,
         event_name,
         event_symbol,
         event_description,
@@ -58,14 +61,20 @@ fun initialize_mints_fixed_supply() {
     ) = share::initialized_event_fields(&events[0]);
     assert_eq!(event_currency_id, currency_id);
     assert_eq!(event_treasury_cap_id, treasury_cap_id);
-    assert_eq!(event_share_type, bcs::to_bytes(&with_defining_ids<Share>()));
+    assert_eq!(
+        event_share_type,
+        with_defining_ids<Share>().into_string().into_bytes(),
+    );
     assert_eq!(event_decimals, 6);
     assert_eq!(event_supply, SUPPLY);
-    assert!(event_supply_fixed);
+    assert!(event_fixed_supply);
+    assert!(event_metadata_cap_deleted);
+    assert!(!event_regulated);
     assert_eq!(event_name, b"Share");
     assert_eq!(event_symbol, b"SHR");
-    assert_eq!(event_description, b"");
-    assert_eq!(event_icon_url, b"");
+    assert_eq!(event_description, b"A distinct description");
+    assert_eq!(event_icon_url, b"https://example.com/icon.png");
+    assert_eq!(sui::event::events_by_type<ShareInitializedEvent<Shares>>().length(), 0);
 
     destroy(balance);
     destroy(currency);
