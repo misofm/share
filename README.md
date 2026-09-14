@@ -38,6 +38,10 @@ share = { git = "https://github.com/misofm/share.git", rev = "<commit-sha>" }
    treasury cap (the one created together with the currency).
 5. Distribute the returned `Balance<Share>` to shareholders.
 
+`initialize` emits `ShareInitializedEvent<Share>`. The phantom type parameter
+identifies the share type without duplicating its name in the event payload.
+The payload records the currency identities, configuration, and metadata.
+
 ## Dependencies
 
 | Dependency | Source |

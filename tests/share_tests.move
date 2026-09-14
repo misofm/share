@@ -12,7 +12,6 @@ use share::legacyotw;
 use share::notshare;
 use share::share::{Self, Share, Shares, ShareInitializedEvent};
 use std::unit_test::{assert_eq, destroy};
-use std::type_name::with_defining_ids;
 
 /// 10,000,000.000000 tokens at 6 decimals — must match share::SUPPLY.
 const SUPPLY: u64 = 10_000_000_000_000;
@@ -48,7 +47,6 @@ fun initialize_mints_fixed_supply() {
     let (
         event_currency_id,
         event_treasury_cap_id,
-        event_share_type,
         event_decimals,
         event_supply,
         event_fixed_supply,
@@ -61,10 +59,6 @@ fun initialize_mints_fixed_supply() {
     ) = share::initialized_event_fields(&events[0]);
     assert_eq!(event_currency_id, currency_id);
     assert_eq!(event_treasury_cap_id, treasury_cap_id);
-    assert_eq!(
-        event_share_type,
-        with_defining_ids<Share>().into_string().into_bytes(),
-    );
     assert_eq!(event_decimals, 6);
     assert_eq!(event_supply, SUPPLY);
     assert!(event_fixed_supply);

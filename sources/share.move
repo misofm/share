@@ -13,7 +13,7 @@
 /// 5. Distribute the returned balance to shareholders
 module share::share;
 
-use std::type_name::{TypeName, with_defining_ids};
+use std::type_name::with_defining_ids;
 use sui::balance::Balance;
 use sui::bcs;
 use sui::coin::TreasuryCap;
@@ -53,7 +53,6 @@ const ETreasuryCapMismatch: u64 = 5;
 public struct ShareInitializedEvent<phantom ShareType> has copy, drop {
     currency_id: address,
     treasury_cap_id: address,
-    share_type: vector<u8>,
     decimals: u8,
     supply: u64,
     fixed_supply: bool,
@@ -112,7 +111,6 @@ public fun initialize<Share>(
     // self-contained for indexers.
     let currency_id = object::id_address(currency);
     let treasury_cap_id = object::id_address(&treasury_cap);
-    let share_type = with_defining_ids<Share>().into_string().into_bytes();
     let name = std::string::into_bytes(currency.name());
     let symbol = std::string::into_bytes(currency.symbol());
     let description = std::string::into_bytes(currency.description());
@@ -127,7 +125,6 @@ public fun initialize<Share>(
     emit(ShareInitializedEvent<Share> {
         currency_id,
         treasury_cap_id,
-        share_type,
         decimals: DECIMALS,
         supply: SUPPLY,
         fixed_supply: currency.is_supply_fixed(),
@@ -258,7 +255,6 @@ public fun initialized_event_fields<ShareType>(
 ): (
     address,
     address,
-    vector<u8>,
     u8,
     u64,
     bool,
@@ -272,7 +268,6 @@ public fun initialized_event_fields<ShareType>(
     (
         event.currency_id,
         event.treasury_cap_id,
-        event.share_type,
         event.decimals,
         event.supply,
         event.fixed_supply,
