@@ -53,10 +53,6 @@ fun initialize_mints_fixed_supply() {
         event_fixed_supply,
         event_metadata_cap_deleted,
         event_regulated,
-        event_name,
-        event_symbol,
-        event_description,
-        event_icon_url,
     ) = share::initialized_event_fields(&events[0]);
     assert_eq!(event_currency_id, currency_id);
     assert_eq!(event_treasury_cap_id, treasury_cap_id);
@@ -65,10 +61,9 @@ fun initialize_mints_fixed_supply() {
     assert!(event_fixed_supply);
     assert!(event_metadata_cap_deleted);
     assert!(!event_regulated);
-    assert_eq!(event_name, b"Share");
-    assert_eq!(event_symbol, b"SHR");
-    assert_eq!(event_description, b"A distinct description");
-    assert_eq!(event_icon_url, b"https://example.com/icon.png");
+    assert_eq!(sui::bcs::to_bytes(&events[0]).length(), 76);
+    assert_eq!(currency.description().into_bytes(), b"A distinct description");
+    assert_eq!(currency.icon_url().into_bytes(), b"https://example.com/icon.png");
     assert_eq!(sui::event::events_by_type<ShareInitializedEvent<Shares>>().length(), 0);
 
     destroy(balance);
