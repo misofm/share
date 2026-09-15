@@ -76,21 +76,8 @@ public fun initialize<Share>(
     currency: &mut Currency<Share>,
     mut treasury_cap: TreasuryCap<Share>,
 ): Balance<Share> {
-    // Assert the share type name ends with `::share::Share`. This name check is
-    // only one part of what makes a valid share; the checks below (canonical
-    // treasury cap, deleted metadata cap, unregulated, decimals, fixed supply)
-    // are what make it trustworthy, so it is deliberately not exposed on its own.
-    let share_type_bytes = bcs::to_bytes(&with_defining_ids<Share>());
-    let bytes_len = share_type_bytes.length();
-    let suffix = SHARE_TYPE;
-    let suffix_len = suffix.length();
-    // `bytes_len >= suffix_len` always holds: every TypeName embeds a 64-char
-    // hex address, so it serializes to >= 70 bytes against a 14-byte suffix.
-    // If that ever stopped holding, the index arithmetic below aborts on
-    // underflow (Move checked arithmetic) — the gate cannot be bypassed.
-    suffix_len.do!(|i| {
-        assert!(share_type_bytes[bytes_len - suffix_len + i] == suffix[i], EInvalidShareType);
-    });
+    // Assert the share type name ends with `::share::Share`.
+    assert!(has_share_type_name<Share>(), EInvalidShareType);
     // Assert the currency's MetadataCap has been deleted,
     // which prevents currency metadata from being modified after initialization.
     assert!(currency.is_metadata_cap_deleted(), EMetadataCapNotDeleted);
@@ -150,6 +137,49 @@ public fun initialize<Share>(
     });
 
     balance
+}
+
+// === Public View Functions ===
+
+/// Returns whether `currency` is a valid share: its type is
+/// `<address>::share::Share`, its metadata cap is deleted, it is not
+/// regulated, it has 6 decimals, and its supply is permanently fixed at
+/// 10,000,000.000000 tokens. This is the complete property set `initialize`
+/// establishes, read back from the currency, so downstream packages can gate
+/// on it. It returns `true` for any currency with that shape, including one
+/// that reached it without `initialize`; such a currency is economically
+/// identical (only the `ShareInitializedEvent` is missing). The canonical
+/// treasury-cap check `initialize` performs needs no counterpart here: a fixed
+/// supply means the treasury cap was consumed, and a fixed supply cannot burn.
+public fun is_share<Share>(currency: &Currency<Share>): bool {
+    has_share_type_name<Share>() &&
+        currency.is_metadata_cap_deleted() &&
+        !currency.is_regulated() &&
+        currency.decimals() == DECIMALS &&
+        currency.is_supply_fixed() &&
+        currency.total_supply() == option::some(SUPPLY)
+}
+
+// === Private Functions ===
+
+/// Whether the type name ends with `::share::Share`. A name check alone does
+/// not make a share (anyone can publish a `share::Share` type), so this is
+/// private; use `is_share` for the full check.
+fun has_share_type_name<Share>(): bool {
+    let bytes = bcs::to_bytes(&with_defining_ids<Share>());
+    let suffix = SHARE_TYPE;
+    let bytes_len = bytes.length();
+    let suffix_len = suffix.length();
+    // `bytes_len >= suffix_len` always holds: every TypeName embeds a 64-char
+    // hex address, so it serializes to >= 70 bytes against a 14-byte suffix.
+    // If that ever stopped holding, the index arithmetic below aborts on
+    // underflow (Move checked arithmetic) — the gate cannot be bypassed.
+    let mut i = 0;
+    while (i < suffix_len) {
+        if (bytes[bytes_len - suffix_len + i] != suffix[i]) return false;
+        i = i + 1;
+    };
+    true
 }
 
 // === Test Only ===

@@ -229,3 +229,158 @@ fun initialize_rejects_wrong_struct_name() {
     destroy(metadata_cap);
     abort
 }
+
+// === is_share ===
+
+/// Mint the exact share supply and fix it without going through `initialize`.
+fun fix_supply_for_testing<T>(
+    currency: &mut sui::coin_registry::Currency<T>,
+    mut treasury_cap: sui::coin::TreasuryCap<T>,
+    amount: u64,
+): sui::balance::Balance<T> {
+    let balance = treasury_cap.mint_balance(amount);
+    currency.make_supply_fixed(treasury_cap);
+    balance
+}
+
+#[test]
+fun is_share_true_after_initialize() {
+    let ctx = &mut tx_context::dummy();
+    let (mut currency, treasury_cap, metadata_cap) =
+        share::new_share_currency_for_testing(6, ctx);
+    currency.delete_metadata_cap(metadata_cap);
+    let balance = share::initialize<Share>(&mut currency, treasury_cap);
+
+    assert!(share::is_share(&currency));
+
+    destroy(balance);
+    destroy(currency);
+}
+
+#[test]
+fun is_share_false_before_initialize() {
+    let ctx = &mut tx_context::dummy();
+    let (mut currency, treasury_cap, metadata_cap) =
+        share::new_share_currency_for_testing(6, ctx);
+    currency.delete_metadata_cap(metadata_cap);
+
+    // Supply is still controlled by the treasury cap (not fixed).
+    assert!(!share::is_share(&currency));
+
+    destroy(treasury_cap);
+    destroy(currency);
+}
+
+#[test]
+fun is_share_true_for_share_shaped_currency_without_initialize() {
+    let ctx = &mut tx_context::dummy();
+    let (mut currency, treasury_cap, metadata_cap) =
+        share::new_share_currency_for_testing(6, ctx);
+    currency.delete_metadata_cap(metadata_cap);
+    let balance = fix_supply_for_testing(&mut currency, treasury_cap, SUPPLY);
+
+    // Economically identical to an initialized share, so it qualifies.
+    assert!(share::is_share(&currency));
+
+    destroy(balance);
+    destroy(currency);
+}
+
+#[test]
+fun is_share_false_for_wrong_module_name() {
+    let ctx = &mut tx_context::dummy();
+    let (mut currency, treasury_cap, metadata_cap) = notshare::new_currency_for_testing(ctx);
+    currency.delete_metadata_cap(metadata_cap);
+    let balance = fix_supply_for_testing(&mut currency, treasury_cap, SUPPLY);
+
+    assert!(!share::is_share(&currency));
+
+    destroy(balance);
+    destroy(currency);
+}
+
+#[test]
+fun is_share_false_for_wrong_struct_name() {
+    let ctx = &mut tx_context::dummy();
+    let (mut currency, treasury_cap, metadata_cap) = share::new_shares_currency_for_testing(ctx);
+    currency.delete_metadata_cap(metadata_cap);
+    let balance = fix_supply_for_testing(&mut currency, treasury_cap, SUPPLY);
+
+    assert!(!share::is_share(&currency));
+
+    destroy(balance);
+    destroy(currency);
+}
+
+#[test]
+fun is_share_false_when_metadata_cap_not_deleted() {
+    let ctx = &mut tx_context::dummy();
+    let (mut currency, treasury_cap, metadata_cap) =
+        share::new_share_currency_for_testing(6, ctx);
+    let balance = fix_supply_for_testing(&mut currency, treasury_cap, SUPPLY);
+
+    assert!(!share::is_share(&currency));
+
+    destroy(balance);
+    destroy(currency);
+    destroy(metadata_cap);
+}
+
+#[test]
+fun is_share_false_for_regulated_currency() {
+    let ctx = &mut tx_context::dummy();
+    let (mut currency, treasury_cap, metadata_cap, deny_cap) =
+        share::new_regulated_share_currency_for_testing(ctx);
+    currency.delete_metadata_cap(metadata_cap);
+    let balance = fix_supply_for_testing(&mut currency, treasury_cap, SUPPLY);
+
+    assert!(!share::is_share(&currency));
+
+    destroy(balance);
+    destroy(currency);
+    destroy(deny_cap);
+}
+
+#[test]
+fun is_share_false_for_wrong_decimals() {
+    let ctx = &mut tx_context::dummy();
+    let (mut currency, treasury_cap, metadata_cap) =
+        share::new_share_currency_for_testing(9, ctx);
+    currency.delete_metadata_cap(metadata_cap);
+    let balance = fix_supply_for_testing(&mut currency, treasury_cap, SUPPLY);
+
+    assert!(!share::is_share(&currency));
+
+    destroy(balance);
+    destroy(currency);
+}
+
+#[test]
+fun is_share_false_for_wrong_fixed_supply() {
+    let ctx = &mut tx_context::dummy();
+    let (mut currency, treasury_cap, metadata_cap) =
+        share::new_share_currency_for_testing(6, ctx);
+    currency.delete_metadata_cap(metadata_cap);
+    let balance = fix_supply_for_testing(&mut currency, treasury_cap, SUPPLY + 1);
+
+    assert!(!share::is_share(&currency));
+
+    destroy(balance);
+    destroy(currency);
+}
+
+#[test]
+fun is_share_false_for_burn_only_supply() {
+    let ctx = &mut tx_context::dummy();
+    let (mut currency, mut treasury_cap, metadata_cap) =
+        share::new_share_currency_for_testing(6, ctx);
+    currency.delete_metadata_cap(metadata_cap);
+    let balance = treasury_cap.mint_balance(SUPPLY);
+    currency.make_supply_burn_only(treasury_cap);
+
+    // Burn-only supply can shrink below the fixed share supply.
+    assert!(!share::is_share(&currency));
+
+    destroy(balance);
+    destroy(currency);
+}
