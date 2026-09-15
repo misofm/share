@@ -205,6 +205,17 @@ public struct Share has key { id: UID }
 #[test_only]
 public struct Shares has key { id: UID }
 
+/// A NON-qualifying type in the right module whose struct name merely ends in
+/// `Share` — `::share::MyShare` — must be rejected (the suffix starts with
+/// `::`, so the struct must be exactly `Share`).
+#[test_only]
+public struct MyShare has key { id: UID }
+
+/// Test-only window onto the private name check, so the length guard and
+/// generic names can be exercised for types that can never have a `Currency`.
+#[test_only]
+public fun has_share_type_name_for_testing<T>(): bool { has_share_type_name<T>() }
+
 /// Registered `Currency<Share>` + treasury + metadata cap with the given
 /// decimals (callers pass 6 for valid setups, anything else to test the
 /// decimals gate). Metadata cap deletion is left to the caller.
@@ -245,6 +256,46 @@ public fun new_shares_currency_for_testing(
     let (currency, metadata_cap) = coin_registry::finalize_unwrap_for_testing(initializer, ctx);
     std::unit_test::destroy(registry);
     (currency, treasury_cap, metadata_cap)
+}
+
+#[test_only]
+public fun new_myshare_currency_for_testing(
+    ctx: &mut TxContext,
+): (Currency<MyShare>, TreasuryCap<MyShare>, MetadataCap<MyShare>) {
+    let mut registry = coin_registry::create_coin_data_registry_for_testing(ctx);
+    let (initializer, treasury_cap) = coin_registry::new_currency<MyShare>(
+        &mut registry,
+        6,
+        b"MYSHR".to_string(),
+        b"MyShare".to_string(),
+        b"".to_string(),
+        b"".to_string(),
+        ctx,
+    );
+    let (currency, metadata_cap) = coin_registry::finalize_unwrap_for_testing(initializer, ctx);
+    std::unit_test::destroy(registry);
+    (currency, treasury_cap, metadata_cap)
+}
+
+/// A `Currency<Share>` (6 decimals) whose `MetadataCap` was never claimed —
+/// `metadata_cap_id` is `Unclaimed`, which is not `Deleted`.
+#[test_only]
+public fun new_share_currency_unclaimed_for_testing(
+    ctx: &mut TxContext,
+): (Currency<Share>, TreasuryCap<Share>) {
+    let mut registry = coin_registry::create_coin_data_registry_for_testing(ctx);
+    let (initializer, treasury_cap) = coin_registry::new_currency<Share>(
+        &mut registry,
+        DECIMALS,
+        b"SHR".to_string(),
+        b"Share".to_string(),
+        b"".to_string(),
+        b"".to_string(),
+        ctx,
+    );
+    let currency = coin_registry::unwrap_for_testing(initializer);
+    std::unit_test::destroy(registry);
+    (currency, treasury_cap)
 }
 
 /// A valid-in-every-other-way `Currency<Share>` that was made **regulated**
