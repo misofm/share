@@ -15,7 +15,6 @@ module share::share;
 
 use std::type_name::with_defining_ids;
 use sui::balance::Balance;
-use sui::bcs;
 use sui::coin::TreasuryCap;
 use sui::coin_registry::Currency;
 use sui::event::emit;
@@ -76,34 +75,21 @@ public fun initialize<Share>(
     currency: &mut Currency<Share>,
     mut treasury_cap: TreasuryCap<Share>,
 ): Balance<Share> {
-    // Assert the share type is valid.
-    assert_valid_share_type<Share>();
-    // Assert the currency's MetadataCap has been deleted,
-    // which prevents currency metadata from being modified after initialization.
-    assert!(currency.is_metadata_cap_deleted(), EMetadataCapNotDeleted);
+    // Assert the share type, metadata lock, regulation and decimals, aborting
+    // with the specific error code of the first failing check.
+    share_config_error(currency).do!(|code| abort code);
     // Assert the presented treasury cap is the canonical cap recorded on the
     // currency at creation. `make_supply_fixed` fixes the supply with whatever
     // cap it is handed without checking, so bind it here: the supply is fixed
     // with the registry's own cap. This also rejects legacy-migrated
-    // currencies as created (`treasury_cap_id: none`). A migrated currency
-    // could only pass if its cap ID were later filled via `set_treasury_cap_id`
-    // with a real `TreasuryCap<T>` — and no legacy `TreasuryCap` of a share
-    // type can ever exist (every legacy constructor is OTW-gated, and a
-    // `::share::Share` type is never a one-time witness), so after this check
-    // the `RegulatedState::Unknown` fail-open gap in `is_regulated()` below is
-    // unreachable for share types.
+    // currencies as created (`treasury_cap_id: none`).
     assert!(
         currency.treasury_cap_id() == option::some(object::id(&treasury_cap)),
         ETreasuryCapMismatch,
     );
-    // Assert the currency is not regulated. A regulated currency has a live
-    // `DenyCapV2` whose holder can deny-list or globally pause holders forever;
-    // shares are meant to be freeze-proof fixed-supply equity, so making the
-    // supply fixed here is not enough — the deny authority must never exist.
-    assert!(!currency.is_regulated(), ERegulatedCurrency);
-    // Assert the currency has the correct number of decimals.
-    assert!(currency.decimals() == DECIMALS, EInvalidDecimals);
-    // Assert the currency has no existing supply.
+    // Assert the currency has no existing supply. Together with minting exactly
+    // `SUPPLY` and fixing it below, this makes the result satisfy `is_share` by
+    // construction, so no post-check is needed.
     assert!(treasury_cap.supply().value() == 0, ENotZeroSupply);
 
     // Capture identifiers before consuming the treasury cap below. These are
@@ -139,27 +125,68 @@ public fun initialize<Share>(
     balance
 }
 
-//=== Assert Functions ===
+// === Public View Functions ===
 
-/// Asserts that the share type name ends with the expected suffix
-/// (`<address>::share::Share`). Public so downstream packages that hold or
-/// route share types (e.g. cap inventories) can enforce the same gate this
-/// package's `initialize` enforces, instead of mirroring it.
-public fun assert_valid_share_type<Share>() {
-    let t = with_defining_ids<Share>();
-    let bytes = bcs::to_bytes(&t);
-    let share_type = SHARE_TYPE;
+/// Returns whether `currency` is a valid share: its type is
+/// `<address>::share::Share`, its metadata cap is deleted, it is not
+/// regulated, it has 6 decimals, and its supply is permanently fixed at
+/// 10,000,000.000000 tokens. This is the complete property set `initialize`
+/// establishes, read back from the currency, so downstream packages can gate
+/// on it. It returns `true` for any currency with that shape, including one
+/// that reached it without `initialize`; such a currency is economically
+/// identical (only the `ShareInitializedEvent` is missing). The canonical
+/// treasury-cap check `initialize` performs needs no counterpart here: a fixed
+/// supply means the treasury cap was consumed, and a fixed supply cannot burn.
+public fun is_share<Share>(currency: &Currency<Share>): bool {
+    // Supply first: two cheap reads that reject most non-share currencies.
+    currency.is_supply_fixed() &&
+        currency.total_supply() == option::some(SUPPLY) &&
+        share_config_error(currency).is_none()
+}
 
+// === Private Functions ===
+
+/// Returns the error code of the first failing configuration check shared by
+/// `initialize` and `is_share`, or `none` if every check passes. Keeping every
+/// check here means the two functions cannot drift apart, and each call runs
+/// each check once.
+fun share_config_error<Share>(currency: &Currency<Share>): Option<u64> {
+    // The type must be `<address>::share::Share`.
+    if (!has_share_type_name<Share>()) return option::some(EInvalidShareType);
+    // The MetadataCap must be deleted, so currency metadata can never change.
+    if (!currency.is_metadata_cap_deleted()) return option::some(EMetadataCapNotDeleted);
+    // The currency must not be regulated. A regulated currency has a live
+    // `DenyCapV2` whose holder can deny-list or globally pause holders forever;
+    // shares are meant to be freeze-proof fixed-supply equity. The
+    // `RegulatedState::Unknown` fail-open case of `is_regulated()` only arises
+    // for legacy-migrated currencies, and none can exist for a share type:
+    // every legacy constructor is OTW-gated, and `::share::Share` is never a
+    // one-time witness.
+    if (currency.is_regulated()) return option::some(ERegulatedCurrency);
+    // The currency must have 6 decimals.
+    if (currency.decimals() != DECIMALS) return option::some(EInvalidDecimals);
+    option::none()
+}
+
+/// Whether the type name ends with `::share::Share`. The suffix includes the
+/// leading `::`, so the module must be exactly `share`, and it ends the string,
+/// so the struct must be exactly `Share` with no type parameters.
+fun has_share_type_name<Share>(): bool {
+    let type_name = with_defining_ids<Share>();
+    // Borrow the name bytes in place rather than serializing a copy.
+    let bytes = type_name.as_string().as_bytes();
+    let suffix = SHARE_TYPE;
     let bytes_len = bytes.length();
-    let suffix_len = share_type.length();
-
-    // `bytes_len >= suffix_len` always holds: every TypeName embeds a 64-char
-    // hex address, so it serializes to >= 70 bytes against a 14-byte suffix.
-    // If that ever stopped holding, the index arithmetic below aborts on
-    // underflow (Move checked arithmetic) — the gate cannot be bypassed.
-    suffix_len.do!(|i| {
-        assert!(bytes[bytes_len - suffix_len + i] == share_type[i], EInvalidShareType);
-    });
+    let suffix_len = suffix.length();
+    // Primitive type names (e.g. `u64`) are shorter than the suffix.
+    if (bytes_len < suffix_len) return false;
+    let offset = bytes_len - suffix_len;
+    let mut i = 0;
+    while (i < suffix_len) {
+        if (bytes[offset + i] != suffix[i]) return false;
+        i = i + 1;
+    };
+    true
 }
 
 // === Test Only ===
@@ -177,6 +204,17 @@ public struct Share has key { id: UID }
 /// `::share::Shares` shifts the suffix window one byte and must be rejected.
 #[test_only]
 public struct Shares has key { id: UID }
+
+/// A NON-qualifying type in the right module whose struct name merely ends in
+/// `Share` — `::share::MyShare` — must be rejected (the suffix starts with
+/// `::`, so the struct must be exactly `Share`).
+#[test_only]
+public struct MyShare has key { id: UID }
+
+/// Test-only window onto the private name check, so the length guard and
+/// generic names can be exercised for types that can never have a `Currency`.
+#[test_only]
+public fun has_share_type_name_for_testing<T>(): bool { has_share_type_name<T>() }
 
 /// Registered `Currency<Share>` + treasury + metadata cap with the given
 /// decimals (callers pass 6 for valid setups, anything else to test the
@@ -218,6 +256,46 @@ public fun new_shares_currency_for_testing(
     let (currency, metadata_cap) = coin_registry::finalize_unwrap_for_testing(initializer, ctx);
     std::unit_test::destroy(registry);
     (currency, treasury_cap, metadata_cap)
+}
+
+#[test_only]
+public fun new_myshare_currency_for_testing(
+    ctx: &mut TxContext,
+): (Currency<MyShare>, TreasuryCap<MyShare>, MetadataCap<MyShare>) {
+    let mut registry = coin_registry::create_coin_data_registry_for_testing(ctx);
+    let (initializer, treasury_cap) = coin_registry::new_currency<MyShare>(
+        &mut registry,
+        6,
+        b"MYSHR".to_string(),
+        b"MyShare".to_string(),
+        b"".to_string(),
+        b"".to_string(),
+        ctx,
+    );
+    let (currency, metadata_cap) = coin_registry::finalize_unwrap_for_testing(initializer, ctx);
+    std::unit_test::destroy(registry);
+    (currency, treasury_cap, metadata_cap)
+}
+
+/// A `Currency<Share>` (6 decimals) whose `MetadataCap` was never claimed —
+/// `metadata_cap_id` is `Unclaimed`, which is not `Deleted`.
+#[test_only]
+public fun new_share_currency_unclaimed_for_testing(
+    ctx: &mut TxContext,
+): (Currency<Share>, TreasuryCap<Share>) {
+    let mut registry = coin_registry::create_coin_data_registry_for_testing(ctx);
+    let (initializer, treasury_cap) = coin_registry::new_currency<Share>(
+        &mut registry,
+        DECIMALS,
+        b"SHR".to_string(),
+        b"Share".to_string(),
+        b"".to_string(),
+        b"".to_string(),
+        ctx,
+    );
+    let currency = coin_registry::unwrap_for_testing(initializer);
+    std::unit_test::destroy(registry);
+    (currency, treasury_cap)
 }
 
 /// A valid-in-every-other-way `Currency<Share>` that was made **regulated**
