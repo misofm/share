@@ -57,10 +57,6 @@ public struct ShareInitializedEvent<phantom ShareType> has copy, drop {
     fixed_supply: bool,
     metadata_cap_deleted: bool,
     regulated: bool,
-    name: vector<u8>,
-    symbol: vector<u8>,
-    description: vector<u8>,
-    icon_url: vector<u8>,
 }
 
 // === Public Functions ===
@@ -97,10 +93,6 @@ public fun initialize<Share>(
     // self-contained for indexers.
     let currency_id = object::id_address(currency);
     let treasury_cap_id = object::id_address(&treasury_cap);
-    let name = std::string::into_bytes(currency.name());
-    let symbol = std::string::into_bytes(currency.symbol());
-    let description = std::string::into_bytes(currency.description());
-    let icon_url = std::string::into_bytes(currency.icon_url());
 
     // Mint the share balance.
     let balance = treasury_cap.mint_balance(SUPPLY);
@@ -116,10 +108,6 @@ public fun initialize<Share>(
         fixed_supply: currency.is_supply_fixed(),
         metadata_cap_deleted: currency.is_metadata_cap_deleted(),
         regulated: currency.is_regulated(),
-        name,
-        symbol,
-        description,
-        icon_url,
     });
 
     balance
@@ -338,10 +326,6 @@ public fun initialized_event_fields<ShareType>(
     bool,
     bool,
     bool,
-    vector<u8>,
-    vector<u8>,
-    vector<u8>,
-    vector<u8>,
 ) {
     (
         event.currency_id,
@@ -351,9 +335,5 @@ public fun initialized_event_fields<ShareType>(
         event.fixed_supply,
         event.metadata_cap_deleted,
         event.regulated,
-        event.name,
-        event.symbol,
-        event.description,
-        event.icon_url,
     )
 }

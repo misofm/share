@@ -40,7 +40,8 @@ share = { git = "https://github.com/misofm/share.git", rev = "<commit-sha>" }
 
 `initialize` emits `ShareInitializedEvent<Share>`. The phantom type parameter
 identifies the share type without duplicating its name in the event payload.
-The payload records the currency identities, configuration, and metadata.
+The fixed-size payload records currency identities and economic configuration.
+Read names, symbols, descriptions and icon URLs from the currency object.
 
 ## Dependencies
 
