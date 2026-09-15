@@ -76,8 +76,21 @@ public fun initialize<Share>(
     currency: &mut Currency<Share>,
     mut treasury_cap: TreasuryCap<Share>,
 ): Balance<Share> {
-    // Assert the share type is valid.
-    assert_valid_share_type<Share>();
+    // Assert the share type name ends with `::share::Share`. This name check is
+    // only one part of what makes a valid share; the checks below (canonical
+    // treasury cap, deleted metadata cap, unregulated, decimals, fixed supply)
+    // are what make it trustworthy, so it is deliberately not exposed on its own.
+    let share_type_bytes = bcs::to_bytes(&with_defining_ids<Share>());
+    let bytes_len = share_type_bytes.length();
+    let suffix = SHARE_TYPE;
+    let suffix_len = suffix.length();
+    // `bytes_len >= suffix_len` always holds: every TypeName embeds a 64-char
+    // hex address, so it serializes to >= 70 bytes against a 14-byte suffix.
+    // If that ever stopped holding, the index arithmetic below aborts on
+    // underflow (Move checked arithmetic) — the gate cannot be bypassed.
+    suffix_len.do!(|i| {
+        assert!(share_type_bytes[bytes_len - suffix_len + i] == suffix[i], EInvalidShareType);
+    });
     // Assert the currency's MetadataCap has been deleted,
     // which prevents currency metadata from being modified after initialization.
     assert!(currency.is_metadata_cap_deleted(), EMetadataCapNotDeleted);
@@ -137,29 +150,6 @@ public fun initialize<Share>(
     });
 
     balance
-}
-
-//=== Assert Functions ===
-
-/// Asserts that the share type name ends with the expected suffix
-/// (`<address>::share::Share`). Public so downstream packages that hold or
-/// route share types (e.g. cap inventories) can enforce the same gate this
-/// package's `initialize` enforces, instead of mirroring it.
-public fun assert_valid_share_type<Share>() {
-    let t = with_defining_ids<Share>();
-    let bytes = bcs::to_bytes(&t);
-    let share_type = SHARE_TYPE;
-
-    let bytes_len = bytes.length();
-    let suffix_len = share_type.length();
-
-    // `bytes_len >= suffix_len` always holds: every TypeName embeds a 64-char
-    // hex address, so it serializes to >= 70 bytes against a 14-byte suffix.
-    // If that ever stopped holding, the index arithmetic below aborts on
-    // underflow (Move checked arithmetic) — the gate cannot be bypassed.
-    suffix_len.do!(|i| {
-        assert!(bytes[bytes_len - suffix_len + i] == share_type[i], EInvalidShareType);
-    });
 }
 
 // === Test Only ===
