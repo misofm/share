@@ -29,9 +29,6 @@ const DECIMALS: u8 = 6;
 
 /// Suffix that all valid share type names must end with.
 const SHARE_TYPE: vector<u8> = b"::share::Share";
-/// Sentinel returned by `share_config_error` when the currency passes every
-/// configuration check. Distinct from every error code below.
-const NO_ERROR: u64 = 18_446_744_073_709_551_615;
 
 // === Errors ===
 
@@ -80,8 +77,7 @@ public fun initialize<Share>(
 ): Balance<Share> {
     // Assert the share type, metadata lock, regulation and decimals, aborting
     // with the specific error code of the first failing check.
-    let error = share_config_error(currency);
-    assert!(error == NO_ERROR, error);
+    share_config_error(currency).do!(|code| abort code);
     // Assert the presented treasury cap is the canonical cap recorded on the
     // currency at creation. `make_supply_fixed` fixes the supply with whatever
     // cap it is handed without checking, so bind it here: the supply is fixed
@@ -145,19 +141,19 @@ public fun is_share<Share>(currency: &Currency<Share>): bool {
     // Supply first: two cheap reads that reject most non-share currencies.
     currency.is_supply_fixed() &&
         currency.total_supply() == option::some(SUPPLY) &&
-        share_config_error(currency) == NO_ERROR
+        share_config_error(currency).is_none()
 }
 
 // === Private Functions ===
 
 /// Returns the error code of the first failing configuration check shared by
-/// `initialize` and `is_share`, or `NO_ERROR`. Keeping every check here means
+/// `initialize` and `is_share`, or `none` if every check passes. Keeping every check here means
 /// the two functions cannot drift apart, and each call runs each check once.
-fun share_config_error<Share>(currency: &Currency<Share>): u64 {
+fun share_config_error<Share>(currency: &Currency<Share>): Option<u64> {
     // The type must be `<address>::share::Share`.
-    if (!has_share_type_name<Share>()) return EInvalidShareType;
+    if (!has_share_type_name<Share>()) return option::some(EInvalidShareType);
     // The MetadataCap must be deleted, so currency metadata can never change.
-    if (!currency.is_metadata_cap_deleted()) return EMetadataCapNotDeleted;
+    if (!currency.is_metadata_cap_deleted()) return option::some(EMetadataCapNotDeleted);
     // The currency must not be regulated. A regulated currency has a live
     // `DenyCapV2` whose holder can deny-list or globally pause holders forever;
     // shares are meant to be freeze-proof fixed-supply equity. The
@@ -165,10 +161,10 @@ fun share_config_error<Share>(currency: &Currency<Share>): u64 {
     // for legacy-migrated currencies, and none can exist for a share type:
     // every legacy constructor is OTW-gated, and `::share::Share` is never a
     // one-time witness.
-    if (currency.is_regulated()) return ERegulatedCurrency;
+    if (currency.is_regulated()) return option::some(ERegulatedCurrency);
     // The currency must have 6 decimals.
-    if (currency.decimals() != DECIMALS) return EInvalidDecimals;
-    NO_ERROR
+    if (currency.decimals() != DECIMALS) return option::some(EInvalidDecimals);
+    option::none()
 }
 
 /// Whether the type name ends with `::share::Share`. The suffix includes the
