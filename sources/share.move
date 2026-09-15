@@ -147,8 +147,9 @@ public fun is_share<Share>(currency: &Currency<Share>): bool {
 // === Private Functions ===
 
 /// Returns the error code of the first failing configuration check shared by
-/// `initialize` and `is_share`, or `none` if every check passes. Keeping every check here means
-/// the two functions cannot drift apart, and each call runs each check once.
+/// `initialize` and `is_share`, or `none` if every check passes. Keeping every
+/// check here means the two functions cannot drift apart, and each call runs
+/// each check once.
 fun share_config_error<Share>(currency: &Currency<Share>): Option<u64> {
     // The type must be `<address>::share::Share`.
     if (!has_share_type_name<Share>()) return option::some(EInvalidShareType);
