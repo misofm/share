@@ -5,7 +5,7 @@
 
 > A [Sui Move](https://docs.sui.io/concepts/sui-move-concepts) package for fixed-supply currency issuance, designed for representing equity-like ownership stakes.
 
-`share::share::initialize` mints exactly **10,000,000.000000** tokens (6 decimals) and makes the supply immutable. It enforces a set of structural invariants at initialization to guarantee the resulting token is well-formed, tamper-proof, and freeze-proof:
+`share::share::initialize` mints exactly **100,000,000.000000** tokens (6 decimals) and makes the supply immutable. It enforces a set of structural invariants at initialization to guarantee the resulting token is well-formed, tamper-proof, and freeze-proof:
 
 - The type parameter must be `<address>::share::Share`
 - The currency's `MetadataCap` must already be deleted (metadata is frozen)

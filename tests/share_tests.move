@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /// Tests for `share::initialize` — the economic root of the ecosystem: every
-/// share supply (10M tokens, 6 decimals, permanently fixed) passes through it,
+/// share supply (100M tokens, 6 decimals, permanently fixed) passes through it,
 /// and the `::share::Share` type-suffix gate decides what counts as a share
 /// type. Covers the happy path, all four abort gates, and the suffix matrix.
 #[test_only]
@@ -14,8 +14,8 @@ use share::notshare;
 use share::share::{Self, Share, Shares, MyShare, ShareInitializedEvent};
 use std::unit_test::{assert_eq, destroy};
 
-/// 10,000,000.000000 tokens at 6 decimals — must match share::SUPPLY.
-const SUPPLY: u64 = 10_000_000_000_000;
+/// 100,000,000.000000 tokens at 6 decimals — must match share::SUPPLY.
+const SUPPLY: u64 = 100_000_000_000_000;
 
 // Error codes from share.move
 const ENotZeroSupply: u64 = 0;
@@ -572,6 +572,21 @@ fun is_share_false_for_fixed_supply_one_below() {
 
     assert!(!share::is_share(&currency));
 
+    destroy(balance);
+    destroy(currency);
+}
+
+/// The prior generation's 10 million whole shares is no longer admissible.
+#[test]
+fun is_share_false_for_previous_generation_supply() {
+    let ctx = &mut tx_context::dummy();
+    let (mut currency, treasury_cap, metadata_cap) =
+        share::new_share_currency_for_testing(6, ctx);
+    currency.delete_metadata_cap(metadata_cap);
+    let balance = fix_supply_for_testing(&mut currency, treasury_cap, 10_000_000_000_000);
+
+    assert!(currency.is_supply_fixed());
+    assert!(!share::is_share(&currency));
     destroy(balance);
     destroy(currency);
 }
