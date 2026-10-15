@@ -19,11 +19,6 @@ recombining ownership, settle and unregister the position, or implement explicit
 operations that preserve reward accounting. Exposing mutable shares in a
 registered position could change its weight without updating the pool.
 
-Tokenization takes custody of native shares as backing. Settle and unregister
-their positions before depositing them, or provide a separate revenue-accounting
-mechanism. Holding receipt
-coins alone does not track accrued earnings.
-
 ## Parent protocols
 
 A protocol creates shares with `share::new` on a parent object it controls,

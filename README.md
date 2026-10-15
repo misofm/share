@@ -1,12 +1,10 @@
 # unconfirmedlabs/share
 
 Fixed-supply ownership scoped to a parent object, for Sui Move. Native ownership
-requires no currency, per-issuance token package, tokenization dependency or
-global registry.
+requires no currency, per-issuance token package or global registry.
 
-The root package contains only `share::share`. Optional currency conversion is a
-[separate `unconfirmedlabs/tokenization` package](https://github.com/unconfirmedlabs/tokenization), depending on
-this package. MusicOS and eventOS can depend on the root package alone.
+The package contains only `share::share`, so MusicOS and eventOS can depend on
+it alone.
 
 ## Create an issuance
 
@@ -78,13 +76,10 @@ protect failed operations. Splits and joins touch no shared objects.
 ## Conservation and integration
 
 Native ownership units are created only by `new`. There is no
-public or package-private reconstruction/mint interface, nonzero burn, issuer
-clawback, or tokenization-specific authority in this package. Every native unit,
-including units held as backing by adapters, remains part of the fixed supply.
-
-The separate tokenization package holds shares and issues coin receipts against
-them. It cannot create native ownership. Other integrations can use the same
-public API without being approved by the parent or this package.
+public or package-private reconstruction/mint interface, nonzero burn or issuer
+clawback in this package. Every native unit, including units held by adapters,
+remains part of the fixed supply. Integrations can use the public API without
+being approved by the parent or this package.
 
 Royalty positions hold native shares alongside reward debt and registration
 state. Payout funds continue to use `Balance<Currency>`. Existing coin-based
@@ -96,8 +91,5 @@ royalty pools require adaptation; see [INTEGRATION.md](INTEGRATION.md).
 sui move build
 sui move test
 ```
-
-Tokenization has its own repository, dependency graph, build and tests:
-[unconfirmedlabs/tokenization](https://github.com/unconfirmedlabs/tokenization).
 
 Licensed under Apache-2.0.

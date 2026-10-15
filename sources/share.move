@@ -1,7 +1,7 @@
 // Copyright (c) Miso Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-/// Fixed-supply ownership scoped to a parent object. No currency is needed until tokenization.
+/// Fixed-supply ownership scoped to a parent object.
 module share::share;
 
 // === Imports ===
@@ -120,10 +120,10 @@ public fun derive_address(parent_id: ID): address {
 public fun parent_id(self: &Issuance): ID { self.parent_id }
 public fun issuance_id(self: &Share): ID { self.issuance_id }
 public fun value(self: &Share): u64 { self.value }
-/// Immutable total base units, including any units held as token backing.
+/// Immutable total base units.
 public fun supply(self: &Issuance): u64 { self.supply }
 
-/// Immutable display precision, matching the corresponding receipt currency.
+/// Immutable display precision.
 public fun decimals(self: &Issuance): u8 { self.decimals }
 
 // === Test Functions ===
