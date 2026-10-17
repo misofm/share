@@ -9,8 +9,8 @@ use sui::coin_registry::{Self, Currency, CoinRegistry, MetadataCap};
 
 /// The expected type in most tests: `share::fixture::Fixture`.
 public struct Fixture has key { id: UID }
-/// A datatype named like the module's one-time witness.
-public struct FIXTURE has key { id: UID }
+/// A generic type, for the exact-name check.
+public struct Generic<phantom X> has key { id: UID }
 
 /// A registry for one test; the dummy context's sender is the system address.
 public fun registry(ctx: &mut TxContext): CoinRegistry {
@@ -59,17 +59,4 @@ public fun regulated(
     let (mut currency, metadata_cap) = coin_registry::finalize_unwrap_for_testing(initializer, ctx);
     currency.delete_metadata_cap(metadata_cap);
     (currency, treasury_cap, deny_cap)
-}
-
-/// `FIXTURE` with the standard test metadata.
-public fun witness_named(
-    registry: &mut CoinRegistry,
-    ctx: &mut TxContext,
-): (Currency<FIXTURE>, TreasuryCap<FIXTURE>) {
-    let (initializer, treasury_cap) = coin_registry::new_currency<FIXTURE>(
-        registry, 6, b"FIX".to_string(), b"Fixture".to_string(), b"".to_string(), b"".to_string(), ctx,
-    );
-    let (mut currency, metadata_cap) = coin_registry::finalize_unwrap_for_testing(initializer, ctx);
-    currency.delete_metadata_cap(metadata_cap);
-    (currency, treasury_cap)
 }
