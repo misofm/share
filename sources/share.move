@@ -15,7 +15,6 @@ module share::share;
 use std::ascii;
 use std::string::String;
 use std::type_name;
-
 use sui::balance::Balance;
 use sui::coin::TreasuryCap;
 use sui::coin_registry::Currency;

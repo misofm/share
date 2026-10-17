@@ -5,7 +5,6 @@ use std::string::String;
 use std::unit_test::{assert_eq, destroy};
 use sui::coin::TreasuryCap;
 use sui::coin_registry::{CoinRegistry, Currency};
-
 use share::fixture::{Self, Fixture, Generic};
 use share::share::{Self, Spec};
 
