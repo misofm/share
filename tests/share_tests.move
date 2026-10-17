@@ -1,163 +1,191 @@
-// Copyright (c) Miso Labs, Inc.
-// SPDX-License-Identifier: Apache-2.0
 #[test_only]
 module share::share_tests;
 
-use share::share::{Self, Issuance, Share};
-use share::fixtures::{Self};
-use std::unit_test::destroy;
-use sui::test_scenario;
+use std::string::String;
+use std::unit_test::{assert_eq, destroy};
+use sui::coin::TreasuryCap;
+use sui::coin_registry::{CoinRegistry, Currency};
+
+use share::fixture::{Self, Fixture};
+use share::share;
 
 const SUPPLY: u64 = 100_000_000_000_000;
-const DECIMALS: u8 = 6;
 
-public struct Wallet has key, store { id: UID, shares: Share }
+fun standard(registry: &mut CoinRegistry, ctx: &mut TxContext): (Currency<Fixture>, TreasuryCap<Fixture>) {
+    fixture::locked(registry, 6, b"FIX".to_string(), b"Fixture".to_string(), b"".to_string(), b"".to_string(), ctx)
+}
 
-#[test]
-fun production_lifecycle_and_discovery() {
-    let mut scenario = test_scenario::begin(@0xA);
-    let mut parent = fixtures::subject(scenario.ctx());
-    let parent_id = object::id(&parent);
-    let expected = share::derive_address(parent_id);
-    let (issuance, shares) = share::new(parent.uid(), SUPPLY, DECIMALS);
-    assert!(object::id_address(&issuance) == expected);
-    assert!(shares.issuance_id().to_address() == expected);
-    issuance.share();
-    transfer::public_transfer(Wallet { id: object::new(scenario.ctx()), shares }, @0xA);
-    parent.keep(@0xA);
-    scenario.next_tx(@0xA);
-    let issuance = scenario.take_shared<Issuance>();
-    assert!(object::id_address(&issuance) == expected);
-    assert!(issuance.parent_id() == parent_id);
-    assert!(issuance.supply() == SUPPLY);
-    assert!(issuance.decimals() == DECIMALS);
-    let Wallet { id, mut shares } = scenario.take_from_sender<Wallet>();
-    id.delete();
-    assert!(shares.value() == SUPPLY);
-    let gift = shares.split(500);
-    transfer::public_transfer(Wallet { id: object::new(scenario.ctx()), shares: gift }, @0xB);
-    transfer::public_transfer(Wallet { id: object::new(scenario.ctx()), shares }, @0xA);
-    test_scenario::return_shared(issuance);
-    scenario.next_tx(@0xB);
-    let wallet = scenario.take_from_sender<Wallet>();
-    assert!(wallet.shares.issuance_id().to_address() == expected);
-    assert!(wallet.shares.value() == 500);
-    test_scenario::return_to_sender(&scenario, wallet);
-    scenario.end();
+/// Mints `Fixture` against the standard expectations with the given overrides.
+fun mint_with<T>(
+    mut currency: Currency<T>,
+    treasury_cap: TreasuryCap<T>,
+    module_name: vector<u8>,
+    datatype_name: vector<u8>,
+    description: String,
+    icon_url: String,
+    supply: u64,
+    registry: CoinRegistry,
+) {
+    let shares = share::mint(
+        &mut currency, treasury_cap, module_name, datatype_name, 6,
+        b"Fixture".to_string(), b"FIX".to_string(), description, icon_url, supply,
+    );
+    assert_eq!(shares.value(), supply);
+    assert!(currency.is_supply_fixed());
+    assert_eq!(currency.total_supply(), option::some(supply));
+    destroy(shares); destroy(currency); destroy(registry);
+}
+
+fun mint_standard<T>(currency: Currency<T>, treasury_cap: TreasuryCap<T>, registry: CoinRegistry) {
+    mint_with(currency, treasury_cap, b"fixture", b"Fixture", b"".to_string(), b"".to_string(), SUPPLY, registry)
 }
 
 #[test]
-fun split_join_and_zero_conserve_supply() {
+fun mints_and_fixes_supply() {
     let ctx = &mut tx_context::dummy();
-    let mut parent = fixtures::subject(ctx);
-    let (issuance, mut shares) = share::new(parent.uid(), SUPPLY, DECIMALS);
-    let mut artist = shares.split(15_000);
-    let fans = artist.split(5_000);
-    assert!(artist.value() == 10_000);
-    assert!(fans.issuance_id() == object::id(&issuance));
-    shares.join_vec(vector[artist, fans]);
-    shares.join_vec(vector[]);
-    assert!(shares.join(share::zero(&issuance)) == SUPPLY);
-    shares.split(0).destroy_zero();
-    let all = shares.withdraw_all();
-    shares.destroy_zero();
-    assert!(all.value() == SUPPLY);
-    destroy(all); destroy(issuance); destroy(parent);
+    let mut registry = fixture::registry(ctx);
+    let (currency, treasury_cap) = standard(&mut registry, ctx);
+    mint_standard(currency, treasury_cap, registry);
 }
 
 #[test]
-fun parents_have_independent_issuances() {
+fun expected_description_and_icon_accepted() {
     let ctx = &mut tx_context::dummy();
-    let mut a = fixtures::subject(ctx);
-    let mut b = fixtures::subject(ctx);
-    let (ia, sa) = share::new(a.uid(), SUPPLY, DECIMALS);
-    let (ib, sb) = share::new(b.uid(), SUPPLY, DECIMALS);
-    assert!(sa.issuance_id() != sb.issuance_id());
-    assert!(ia.parent_id() == object::id(&a));
-    assert!(ib.parent_id() == object::id(&b));
-    assert!(sa.value() == sb.value());
-    destroy(ia); destroy(sa); destroy(ib); destroy(sb); destroy(a); destroy(b);
-}
-
-#[test, expected_failure(abort_code = sui::derived_object::EObjectAlreadyExists)]
-fun duplicate_issuance_rejected() {
-    let ctx = &mut tx_context::dummy();
-    let mut parent = fixtures::subject(ctx);
-    let (first, first_shares) = share::new(parent.uid(), SUPPLY, DECIMALS);
-    // Even disposal of the original issuance does not free the parent's claim.
-    destroy(first); destroy(first_shares);
-    let (second, second_shares) = share::new(parent.uid(), SUPPLY, DECIMALS);
-    destroy(second); destroy(second_shares); destroy(parent);
-}
-
-#[test, expected_failure(abort_code = 0, location = share)]
-fun oversplit_rejected() {
-    let ctx = &mut tx_context::dummy();
-    let mut parent = fixtures::subject(ctx);
-    let (issuance, mut shares) = share::new(parent.uid(), SUPPLY, DECIMALS);
-    let invalid = shares.split(SUPPLY + 1);
-    destroy(invalid); destroy(shares); destroy(issuance); destroy(parent);
-}
-
-#[test, expected_failure(abort_code = 2, location = share)]
-fun nonzero_destruction_rejected() {
-    let ctx = &mut tx_context::dummy();
-    let mut parent = fixtures::subject(ctx);
-    let (issuance, shares) = share::new(parent.uid(), SUPPLY, DECIMALS);
-    shares.destroy_zero();
-    destroy(issuance); destroy(parent);
-}
-
-#[test, expected_failure(abort_code = 1, location = share)]
-fun cross_issuance_join_rejected() {
-    let ctx = &mut tx_context::dummy();
-    let mut a = fixtures::subject(ctx);
-    let mut b = fixtures::subject(ctx);
-    let (ia, mut sa) = share::new(a.uid(), SUPPLY, DECIMALS);
-    let (ib, sb) = share::new(b.uid(), SUPPLY, DECIMALS);
-    sa.join(sb);
-    destroy(ia); destroy(ib); destroy(sa); destroy(a); destroy(b);
-}
-
-#[test, expected_failure(abort_code = 1, location = share)]
-fun vector_join_checks_every_element_including_zero() {
-    let ctx = &mut tx_context::dummy();
-    let mut a = fixtures::subject(ctx);
-    let mut b = fixtures::subject(ctx);
-    let (ia, mut sa) = share::new(a.uid(), SUPPLY, DECIMALS);
-    let (ib, sb) = share::new(b.uid(), SUPPLY, DECIMALS);
-    let valid = sa.split(100);
-    sa.join_vec(vector[valid, share::zero(&ib)]);
-    destroy(ia); destroy(ib); destroy(sa); destroy(sb); destroy(a); destroy(b);
+    let mut registry = fixture::registry(ctx);
+    let (currency, treasury_cap) = fixture::locked(
+        &mut registry, 6, b"FIX".to_string(), b"Fixture".to_string(),
+        b"About".to_string(), b"https://example.com/i.png".to_string(), ctx,
+    );
+    mint_with(
+        currency, treasury_cap, b"fixture", b"Fixture",
+        b"About".to_string(), b"https://example.com/i.png".to_string(), SUPPLY, registry,
+    );
 }
 
 #[test]
-fun configurable_supply_and_decimal_boundaries() {
+fun max_supply_accepted() {
     let ctx = &mut tx_context::dummy();
-    configurable_split_join(1, 0, ctx);
-    configurable_split_join(57, 8, ctx);
-    configurable_split_join(100_000_000_000_000, 6, ctx);
-    configurable_split_join(std::u64::max_value!(), 255, ctx);
+    let mut registry = fixture::registry(ctx);
+    let (currency, treasury_cap) = standard(&mut registry, ctx);
+    mint_with(currency, treasury_cap, b"fixture", b"Fixture", b"".to_string(), b"".to_string(), 0xFFFF_FFFF_FFFF_FFFF, registry);
 }
 
-fun configurable_split_join(supply: u64, decimals: u8, ctx: &mut TxContext) {
-    let mut parent = fixtures::subject(ctx);
-    let (issuance, mut shares) = share::new(parent.uid(), supply, decimals);
-    assert!(issuance.supply() == supply);
-    assert!(issuance.decimals() == decimals);
-    assert!(shares.value() == supply);
-    let unit = shares.split(1);
-    assert!(shares.join(unit) == supply);
-    let all = shares.withdraw_all();
-    shares.destroy_zero();
-    assert!(all.value() == issuance.supply());
-    destroy(all); destroy(issuance); destroy(parent);
+#[test, expected_failure(abort_code = share::EInvalidType)]
+fun wrong_datatype_rejected() {
+    let ctx = &mut tx_context::dummy();
+    let mut registry = fixture::registry(ctx);
+    let (currency, treasury_cap) = standard(&mut registry, ctx);
+    mint_with(currency, treasury_cap, b"fixture", b"Other", b"".to_string(), b"".to_string(), SUPPLY, registry);
 }
 
-#[test, expected_failure(abort_code = 3, location = share)]
-fun zero_initial_supply_rejected() {
+#[test, expected_failure(abort_code = share::EInvalidType)]
+fun wrong_module_rejected() {
     let ctx = &mut tx_context::dummy();
-    let mut parent = fixtures::subject(ctx);
-    let (issuance, shares) = share::new(parent.uid(), 0, 6);
-    destroy(issuance); destroy(shares); destroy(parent);
+    let mut registry = fixture::registry(ctx);
+    let (currency, treasury_cap) = standard(&mut registry, ctx);
+    mint_with(currency, treasury_cap, b"other", b"Fixture", b"".to_string(), b"".to_string(), SUPPLY, registry);
+}
+
+#[test, expected_failure(abort_code = share::EInvalidType)]
+fun one_time_witness_name_rejected() {
+    let ctx = &mut tx_context::dummy();
+    let mut registry = fixture::registry(ctx);
+    let (currency, treasury_cap) = fixture::witness_named(&mut registry, ctx);
+    mint_with(currency, treasury_cap, b"fixture", b"FIXTURE", b"".to_string(), b"".to_string(), SUPPLY, registry);
+}
+
+#[test, expected_failure(abort_code = share::ETreasuryMismatch)]
+fun foreign_treasury_cap_rejected() {
+    let ctx = &mut tx_context::dummy();
+    let mut registry = fixture::registry(ctx);
+    let mut other_registry = fixture::registry(ctx);
+    let (currency, treasury_cap) = standard(&mut registry, ctx);
+    let (other_currency, other_treasury_cap) = standard(&mut other_registry, ctx);
+    destroy(other_currency); destroy(other_registry); destroy(treasury_cap);
+    mint_standard(currency, other_treasury_cap, registry);
+}
+
+#[test, expected_failure(abort_code = share::ENotZeroSupply)]
+fun minted_currency_rejected() {
+    let ctx = &mut tx_context::dummy();
+    let mut registry = fixture::registry(ctx);
+    let (currency, mut treasury_cap) = standard(&mut registry, ctx);
+    destroy(treasury_cap.mint_balance(1));
+    mint_standard(currency, treasury_cap, registry);
+}
+
+#[test, expected_failure(abort_code = share::ERegulatedCurrency)]
+fun regulated_currency_rejected() {
+    let ctx = &mut tx_context::dummy();
+    let mut registry = fixture::registry(ctx);
+    let (currency, treasury_cap, deny_cap) = fixture::regulated(&mut registry, ctx);
+    destroy(deny_cap);
+    mint_standard(currency, treasury_cap, registry);
+}
+
+#[test, expected_failure(abort_code = share::EMetadataNotLocked)]
+fun unlocked_metadata_rejected() {
+    let ctx = &mut tx_context::dummy();
+    let mut registry = fixture::registry(ctx);
+    let (currency, treasury_cap, metadata_cap) = fixture::unlocked(&mut registry, ctx);
+    destroy(metadata_cap);
+    mint_standard(currency, treasury_cap, registry);
+}
+
+#[test, expected_failure(abort_code = share::EInvalidDecimals)]
+fun wrong_decimals_rejected() {
+    let ctx = &mut tx_context::dummy();
+    let mut registry = fixture::registry(ctx);
+    let (currency, treasury_cap) = fixture::locked(
+        &mut registry, 9, b"FIX".to_string(), b"Fixture".to_string(), b"".to_string(), b"".to_string(), ctx,
+    );
+    mint_standard(currency, treasury_cap, registry);
+}
+
+#[test, expected_failure(abort_code = share::EInvalidName)]
+fun wrong_name_rejected() {
+    let ctx = &mut tx_context::dummy();
+    let mut registry = fixture::registry(ctx);
+    let (currency, treasury_cap) = fixture::locked(
+        &mut registry, 6, b"FIX".to_string(), b"Other".to_string(), b"".to_string(), b"".to_string(), ctx,
+    );
+    mint_standard(currency, treasury_cap, registry);
+}
+
+#[test, expected_failure(abort_code = share::EInvalidSymbol)]
+fun wrong_symbol_rejected() {
+    let ctx = &mut tx_context::dummy();
+    let mut registry = fixture::registry(ctx);
+    let (currency, treasury_cap) = fixture::locked(
+        &mut registry, 6, b"OTHER".to_string(), b"Fixture".to_string(), b"".to_string(), b"".to_string(), ctx,
+    );
+    mint_standard(currency, treasury_cap, registry);
+}
+
+#[test, expected_failure(abort_code = share::EInvalidDescription)]
+fun wrong_description_rejected() {
+    let ctx = &mut tx_context::dummy();
+    let mut registry = fixture::registry(ctx);
+    let (currency, treasury_cap) = fixture::locked(
+        &mut registry, 6, b"FIX".to_string(), b"Fixture".to_string(), b"About".to_string(), b"".to_string(), ctx,
+    );
+    mint_standard(currency, treasury_cap, registry);
+}
+
+#[test, expected_failure(abort_code = share::EInvalidIconUrl)]
+fun wrong_icon_rejected() {
+    let ctx = &mut tx_context::dummy();
+    let mut registry = fixture::registry(ctx);
+    let (currency, treasury_cap) = fixture::locked(
+        &mut registry, 6, b"FIX".to_string(), b"Fixture".to_string(), b"".to_string(), b"https://example.com/i.png".to_string(), ctx,
+    );
+    mint_standard(currency, treasury_cap, registry);
+}
+
+#[test, expected_failure(abort_code = share::EZeroSupply)]
+fun zero_supply_rejected() {
+    let ctx = &mut tx_context::dummy();
+    let mut registry = fixture::registry(ctx);
+    let (currency, treasury_cap) = standard(&mut registry, ctx);
+    mint_with(currency, treasury_cap, b"fixture", b"Fixture", b"".to_string(), b"".to_string(), 0, registry);
 }
