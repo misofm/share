@@ -3,16 +3,18 @@
 Canonical fixed-supply share coins for Sui Move.
 
 A share coin is an ordinary `Coin<T>` whose type, metadata and supply are pinned
-by the protocol that uses it. A protocol describes its coin with a `Spec`;
-`mint` checks a freshly registered currency against the spec, mints the whole
-supply and fixes it; `is_share` reads the same properties back later. Coins of
-the same spec are identical apart from their package address. MusicOS uses this
-for composition and recording shares.
+by the protocol that uses it. `mint` checks a freshly registered currency against
+the protocol's expected values, mints the whole supply and fixes it. Coins minted
+with the same values are identical apart from their package address. MusicOS uses
+this for composition and recording shares, and treats a work object as proof that
+its coin passed `mint`.
 
 ## Usage
 
 ```move
-let spec = share::spec(
+let shares: Balance<T> = share::mint(
+    &mut currency,
+    treasury_cap,
     b"composition_share",          // module
     b"CompositionShare",           // datatype
     6,                             // decimals
@@ -22,34 +24,26 @@ let spec = share::spec(
     b"".to_string(),               // icon URL
     100_000_000_000_000,           // supply in base units
 );
-
-let shares: Balance<T> = share::mint(&mut currency, treasury_cap, &spec);
-assert!(share::is_share(&currency, &spec));
 ```
 
 ## Guarantees
 
-`mint<T: key>` aborts unless:
+`mint<T: key>` aborts unless, in this order:
 
 | Check | Error |
 |---|---|
+| The supply is positive | `EZeroSupply` |
 | `T` is exactly `<package>::<module>::<datatype>`, with no type arguments | `EInvalidType` |
 | The metadata cap is deleted | `EMetadataNotLocked` |
 | The currency is unregulated | `ERegulatedCurrency` |
-| Decimals, name, symbol, description and icon URL equal the spec | `EInvalidDecimals` … `EInvalidIconUrl` |
+| Decimals, name, symbol, description and icon URL equal the expected values | `EInvalidDecimals` … `EInvalidIconUrl` |
 | The treasury cap is the one recorded on the currency | `ETreasuryMismatch` |
 | Nothing is minted | `ENotZeroSupply` |
-
-`spec` aborts with `EZeroSupply` unless the supply is positive.
 
 `mint` then mints the supply and consumes the treasury cap with
 `coin_registry::make_supply_fixed`, so the currency can be minted only once and
 its supply never changes. Minting then burning back to zero beforehand is
 harmless: nothing is outstanding.
-
-`is_share<T: key>` returns true for a currency with the spec's type and metadata,
-unregulated, with metadata locked and supply fixed at exactly the spec's supply.
-`mint` and `is_share` share one check, so they can't drift apart.
 
 The `key` bound excludes legacy coins. Legacy constructors need a one-time
 witness, which has only `drop`, so every accepted currency came from
@@ -64,7 +58,7 @@ treasury cap until they mint.
 
 `coin_registry::new_currency<T>` must be called from `T`'s own module, so each
 share type lives in a small package of its own. Register the currency with the
-spec's metadata, delete the metadata cap (`finalize_and_delete_metadata_cap`)
+expected metadata, delete the metadata cap (`finalize_and_delete_metadata_cap`)
 and pass the treasury cap to the protocol that calls `mint`.
 
 ## Framework assumptions
