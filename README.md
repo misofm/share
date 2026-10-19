@@ -1,4 +1,4 @@
-# unconfirmedlabs/share
+# misofm/share
 
 Canonical fixed-supply share coins for Sui Move.
 
