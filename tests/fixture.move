@@ -1,3 +1,6 @@
+// Copyright (c) Miso Labs, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 /// Test currencies. `coin_registry::new_currency` must be called from the
 /// type's own module; each test builds its own registry.
 #[test_only]
@@ -28,9 +31,18 @@ public fun locked(
     ctx: &mut TxContext,
 ): (Currency<Fixture>, TreasuryCap<Fixture>) {
     let (initializer, treasury_cap) = coin_registry::new_currency<Fixture>(
-        registry, decimals, symbol, name, description, icon_url, ctx,
+        registry,
+        decimals,
+        symbol,
+        name,
+        description,
+        icon_url,
+        ctx,
     );
-    let (mut currency, metadata_cap) = coin_registry::finalize_unwrap_for_testing(initializer, ctx);
+    let (mut currency, metadata_cap) = coin_registry::finalize_unwrap_for_testing(
+        initializer,
+        ctx,
+    );
     currency.delete_metadata_cap(metadata_cap);
     (currency, treasury_cap)
 }
@@ -41,7 +53,13 @@ public fun unlocked(
     ctx: &mut TxContext,
 ): (Currency<Fixture>, TreasuryCap<Fixture>, MetadataCap<Fixture>) {
     let (initializer, treasury_cap) = coin_registry::new_currency<Fixture>(
-        registry, 6, b"FIX".to_string(), b"Fixture".to_string(), b"".to_string(), b"".to_string(), ctx,
+        registry,
+        6,
+        b"FIX".to_string(),
+        b"Fixture".to_string(),
+        b"".to_string(),
+        b"".to_string(),
+        ctx,
     );
     let (currency, metadata_cap) = coin_registry::finalize_unwrap_for_testing(initializer, ctx);
     (currency, treasury_cap, metadata_cap)
@@ -53,10 +71,19 @@ public fun regulated(
     ctx: &mut TxContext,
 ): (Currency<Fixture>, TreasuryCap<Fixture>, DenyCapV2<Fixture>) {
     let (mut initializer, treasury_cap) = coin_registry::new_currency<Fixture>(
-        registry, 6, b"FIX".to_string(), b"Fixture".to_string(), b"".to_string(), b"".to_string(), ctx,
+        registry,
+        6,
+        b"FIX".to_string(),
+        b"Fixture".to_string(),
+        b"".to_string(),
+        b"".to_string(),
+        ctx,
     );
     let deny_cap = initializer.make_regulated(false, ctx);
-    let (mut currency, metadata_cap) = coin_registry::finalize_unwrap_for_testing(initializer, ctx);
+    let (mut currency, metadata_cap) = coin_registry::finalize_unwrap_for_testing(
+        initializer,
+        ctx,
+    );
     currency.delete_metadata_cap(metadata_cap);
     (currency, treasury_cap, deny_cap)
 }

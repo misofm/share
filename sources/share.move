@@ -35,19 +35,16 @@ const EZeroSupply: u64 = 10;
 
 /// Mints `supply` of `T` and fixes it. `T` must be exactly
 /// `<package>::<module_name>::<datatype_name>` with the given metadata, its
-/// metadata cap deleted, unregulated, with nothing minted. Aborts with the
-/// first failing check, in error-code order after `EZeroSupply`.
-/// `T: key` excludes legacy coins: their constructors need a one-time
-/// witness, which has only `drop`, so the currency came from `coin_registry`
-/// and `is_regulated` is never `Unknown`.
+/// metadata cap deleted, unregulated, with nothing minted. Checks abort in the
+/// order documented in the README, starting with `EZeroSupply`.
 public fun mint<T: key>(
     currency: &mut Currency<T>,
     mut treasury_cap: TreasuryCap<T>,
     module_name: vector<u8>,
     datatype_name: vector<u8>,
     decimals: u8,
-    name: String,
     symbol: String,
+    name: String,
     description: String,
     icon_url: String,
     supply: u64,
@@ -61,7 +58,10 @@ public fun mint<T: key>(
     assert!(currency.symbol() == symbol, EInvalidSymbol);
     assert!(currency.description() == description, EInvalidDescription);
     assert!(currency.icon_url() == icon_url, EInvalidIconUrl);
-    assert!(currency.treasury_cap_id() == option::some(object::id(&treasury_cap)), ETreasuryMismatch);
+    assert!(
+        currency.treasury_cap_id() == option::some(object::id(&treasury_cap)),
+        ETreasuryMismatch,
+    );
     assert!(treasury_cap.total_supply() == 0, ENotZeroSupply);
 
     let shares = treasury_cap.mint_balance(supply);
@@ -71,8 +71,8 @@ public fun mint<T: key>(
 
 // === Private Functions ===
 
-/// True only for exactly `<address>::<module_name>::<datatype_name>`, with no
-/// type arguments.
+/// True only for exactly `<address>::<module_name>::<datatype_name>`, which
+/// excludes type arguments when `datatype_name` contains no `<`.
 fun is_type<T: key>(module_name: vector<u8>, datatype_name: vector<u8>): bool {
     let type_name = type_name::with_defining_ids<T>();
     let mut expected = type_name.address_string().into_bytes();
@@ -86,6 +86,9 @@ fun is_type<T: key>(module_name: vector<u8>, datatype_name: vector<u8>): bool {
 // === Test Functions ===
 
 #[test_only]
-public fun is_type_for_testing<T: key>(module_name: vector<u8>, datatype_name: vector<u8>): bool {
+public fun is_type_for_testing<T: key>(
+    module_name: vector<u8>,
+    datatype_name: vector<u8>,
+): bool {
     is_type<T>(module_name, datatype_name)
 }

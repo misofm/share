@@ -15,14 +15,14 @@ its coin passed `mint`.
 let shares: Balance<T> = share::mint(
     &mut currency,
     treasury_cap,
-    b"composition_share",          // module
-    b"CompositionShare",           // datatype
-    6,                             // decimals
-    b"Composition Share".to_string(),
-    b"CSHARE".to_string(),
-    b"".to_string(),               // description
-    b"".to_string(),               // icon URL
-    100_000_000_000_000,           // supply in base units
+    b"composition_share",             // module
+    b"CompositionShare",              // datatype
+    6,                                // decimals
+    b"CSHARE".to_string(),            // symbol
+    b"Composition Share".to_string(), // name
+    b"".to_string(),                  // description
+    b"".to_string(),                  // icon URL
+    100_000_000_000_000,              // supply in base units
 );
 ```
 
@@ -33,7 +33,7 @@ let shares: Balance<T> = share::mint(
 | Check | Error |
 |---|---|
 | The supply is positive | `EZeroSupply` |
-| `T` is exactly `<package>::<module>::<datatype>`, with no type arguments | `EInvalidType` |
+| `T` is exactly `<package>::<module>::<datatype>` (no type arguments when `<datatype>` contains no `<`) | `EInvalidType` |
 | The metadata cap is deleted | `EMetadataNotLocked` |
 | The currency is unregulated | `ERegulatedCurrency` |
 | Decimals, name, symbol, description and icon URL equal the expected values | `EInvalidDecimals` … `EInvalidIconUrl` |
@@ -64,9 +64,11 @@ and pass the treasury cap to the protocol that calls `mint`.
 ## Framework assumptions
 
 Re-verify on framework changes: `new_currency` can only be called from `T`'s
-module and once per type; one-time witnesses have only `drop`;
-`make_supply_fixed` accepts any cap of the right type, hence the treasury cap
-check.
+module and once per type; one-time witnesses have only `drop`. The
+`ETreasuryMismatch` check is defense in depth: for `T: key` only one
+`TreasuryCap<T>` can exist (`coin::new_treasury_cap` is package-only and the
+legacy constructors need `T: drop`), so it guards against future framework
+changes.
 
 ## Build and test
 

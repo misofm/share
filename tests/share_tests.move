@@ -1,3 +1,6 @@
+// Copyright (c) Miso Labs, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 #[test_only]
 module share::share_tests;
 
@@ -7,12 +10,14 @@ use sui::balance::Balance;
 use sui::coin::TreasuryCap;
 use sui::coin_registry::{CoinRegistry, Currency};
 use share::fixture::{Self, Fixture, Generic};
+use share::other_fixture;
 use share::share;
 
 const SUPPLY: u64 = 100_000_000_000_000;
+const ICON_URL: vector<u8> = b"https://example.com/i.png";
 
-/// Mints with the standard type and name, and the given description, icon
-/// and supply.
+/// Mints with the standard type, decimals, symbol and name, and the given
+/// description, icon and supply.
 fun mint_with(
     currency: &mut Currency<Fixture>,
     treasury_cap: TreasuryCap<Fixture>,
@@ -21,18 +26,75 @@ fun mint_with(
     supply: u64,
 ): Balance<Fixture> {
     share::mint(
-        currency, treasury_cap, b"fixture", b"Fixture", 6, b"Fixture".to_string(), b"FIX".to_string(),
-        description, icon_url, supply,
+        currency,
+        treasury_cap,
+        b"fixture",
+        b"Fixture",
+        6,
+        b"FIX".to_string(),
+        b"Fixture".to_string(),
+        description,
+        icon_url,
+        supply,
     )
 }
 
 /// Mints with the standard expectations.
-fun mint_standard(currency: &mut Currency<Fixture>, treasury_cap: TreasuryCap<Fixture>): Balance<Fixture> {
+fun mint_standard(
+    currency: &mut Currency<Fixture>,
+    treasury_cap: TreasuryCap<Fixture>,
+): Balance<Fixture> {
     mint_with(currency, treasury_cap, b"".to_string(), b"".to_string(), SUPPLY)
 }
 
-fun standard(registry: &mut CoinRegistry, ctx: &mut TxContext): (Currency<Fixture>, TreasuryCap<Fixture>) {
-    fixture::locked(registry, 6, b"FIX".to_string(), b"Fixture".to_string(), b"".to_string(), b"".to_string(), ctx)
+/// Mints with the standard metadata and the given module and datatype names.
+fun mint_named(
+    currency: &mut Currency<Fixture>,
+    treasury_cap: TreasuryCap<Fixture>,
+    module_name: vector<u8>,
+    datatype_name: vector<u8>,
+): Balance<Fixture> {
+    share::mint(
+        currency,
+        treasury_cap,
+        module_name,
+        datatype_name,
+        6,
+        b"FIX".to_string(),
+        b"Fixture".to_string(),
+        b"".to_string(),
+        b"".to_string(),
+        SUPPLY,
+    )
+}
+
+/// A locked `Fixture` with the standard metadata.
+fun standard(
+    registry: &mut CoinRegistry,
+    ctx: &mut TxContext,
+): (Currency<Fixture>, TreasuryCap<Fixture>) {
+    locked_with(registry, 6, b"FIX", b"Fixture", b"", b"", ctx)
+}
+
+/// A locked `Fixture` with the given metadata.
+fun locked_with(
+    registry: &mut CoinRegistry,
+    decimals: u8,
+    symbol: vector<u8>,
+    name: vector<u8>,
+    description: vector<u8>,
+    icon_url: vector<u8>,
+    ctx: &mut TxContext,
+): (Currency<Fixture>, TreasuryCap<Fixture>) {
+    fixture::locked(
+        registry,
+        decimals,
+        symbol.to_string(),
+        name.to_string(),
+        description.to_string(),
+        icon_url.to_string(),
+        ctx,
+    )
 }
 
 /// Mints `supply` and checks it is minted and fixed.
@@ -46,7 +108,9 @@ fun mint_and_check(
     assert_eq!(shares.value(), supply);
     assert!(currency.is_supply_fixed());
     assert_eq!(currency.total_supply(), option::some(supply));
-    destroy(shares); destroy(currency); destroy(registry);
+    destroy(shares);
+    destroy(currency);
+    destroy(registry);
 }
 
 // === mint ===
@@ -57,6 +121,14 @@ fun mints_and_fixes_supply() {
     let mut registry = fixture::registry(ctx);
     let (currency, treasury_cap) = standard(&mut registry, ctx);
     mint_and_check(currency, treasury_cap, SUPPLY, registry);
+}
+
+#[test]
+fun supply_of_one_accepted() {
+    let ctx = &mut tx_context::dummy();
+    let mut registry = fixture::registry(ctx);
+    let (currency, treasury_cap) = standard(&mut registry, ctx);
+    mint_and_check(currency, treasury_cap, 1, registry);
 }
 
 #[test]
@@ -72,13 +144,26 @@ fun max_supply_accepted() {
 fun expected_description_and_icon_accepted() {
     let ctx = &mut tx_context::dummy();
     let mut registry = fixture::registry(ctx);
-    let (mut currency, treasury_cap) = fixture::locked(
-        &mut registry, 6, b"FIX".to_string(), b"Fixture".to_string(),
-        b"About".to_string(), b"https://example.com/i.png".to_string(), ctx,
+    let (mut currency, treasury_cap) = locked_with(
+        &mut registry,
+        6,
+        b"FIX",
+        b"Fixture",
+        b"About",
+        ICON_URL,
+        ctx,
     );
-    let shares = mint_with(&mut currency, treasury_cap, b"About".to_string(), b"https://example.com/i.png".to_string(), SUPPLY);
+    let shares = mint_with(
+        &mut currency,
+        treasury_cap,
+        b"About".to_string(),
+        ICON_URL.to_string(),
+        SUPPLY,
+    );
     assert_eq!(shares.value(), SUPPLY);
-    destroy(shares); destroy(currency); destroy(registry);
+    destroy(shares);
+    destroy(currency);
+    destroy(registry);
 }
 
 /// Minting then burning back to zero leaves nothing outstanding, so `mint`
@@ -107,10 +192,7 @@ fun wrong_datatype_rejected() {
     let ctx = &mut tx_context::dummy();
     let mut registry = fixture::registry(ctx);
     let (mut currency, treasury_cap) = standard(&mut registry, ctx);
-    destroy(share::mint(
-        &mut currency, treasury_cap, b"fixture", b"Other", 6, b"Fixture".to_string(), b"FIX".to_string(),
-        b"".to_string(), b"".to_string(), SUPPLY,
-    ));
+    destroy(mint_named(&mut currency, treasury_cap, b"fixture", b"Other"));
     abort
 }
 
@@ -119,10 +201,16 @@ fun wrong_module_rejected() {
     let ctx = &mut tx_context::dummy();
     let mut registry = fixture::registry(ctx);
     let (mut currency, treasury_cap) = standard(&mut registry, ctx);
-    destroy(share::mint(
-        &mut currency, treasury_cap, b"other", b"Fixture", 6, b"Fixture".to_string(), b"FIX".to_string(),
-        b"".to_string(), b"".to_string(), SUPPLY,
-    ));
+    destroy(mint_named(&mut currency, treasury_cap, b"other", b"Fixture"));
+    abort
+}
+
+#[test, expected_failure(abort_code = share::EInvalidType)]
+fun swapped_names_rejected() {
+    let ctx = &mut tx_context::dummy();
+    let mut registry = fixture::registry(ctx);
+    let (mut currency, treasury_cap) = standard(&mut registry, ctx);
+    destroy(mint_named(&mut currency, treasury_cap, b"Fixture", b"fixture"));
     abort
 }
 
@@ -130,6 +218,30 @@ fun wrong_module_rejected() {
 fun generic_type_never_matches() {
     assert!(!share::is_type_for_testing<Generic<Fixture>>(b"fixture", b"Generic"));
     assert!(share::is_type_for_testing<Fixture>(b"fixture", b"Fixture"));
+}
+
+/// `::` inside either name never splits into a matching path.
+#[test]
+fun injected_separator_never_matches() {
+    assert!(!share::is_type_for_testing<Fixture>(b"fixture::Fixture", b""));
+    assert!(!share::is_type_for_testing<Fixture>(b"", b"fixture::Fixture"));
+    assert!(!share::is_type_for_testing<Fixture>(b"fixture::fixture", b"Fixture"));
+    assert!(!share::is_type_for_testing<Fixture>(b"fixture", b"Fixture::Fixture"));
+}
+
+#[test]
+fun empty_names_never_match() {
+    assert!(!share::is_type_for_testing<Fixture>(b"", b"Fixture"));
+    assert!(!share::is_type_for_testing<Fixture>(b"fixture", b""));
+    assert!(!share::is_type_for_testing<Fixture>(b"", b""));
+}
+
+/// The module name distinguishes types with the same datatype name.
+#[test]
+fun same_datatype_in_other_module_never_matches() {
+    assert!(!share::is_type_for_testing<other_fixture::Fixture>(b"fixture", b"Fixture"));
+    assert!(share::is_type_for_testing<other_fixture::Fixture>(b"other_fixture", b"Fixture"));
+    assert!(!share::is_type_for_testing<Fixture>(b"other_fixture", b"Fixture"));
 }
 
 #[test, expected_failure(abort_code = share::EMetadataNotLocked)]
@@ -156,8 +268,14 @@ fun regulated_currency_rejected() {
 fun wrong_decimals_rejected() {
     let ctx = &mut tx_context::dummy();
     let mut registry = fixture::registry(ctx);
-    let (mut currency, treasury_cap) = fixture::locked(
-        &mut registry, 9, b"FIX".to_string(), b"Fixture".to_string(), b"".to_string(), b"".to_string(), ctx,
+    let (mut currency, treasury_cap) = locked_with(
+        &mut registry,
+        9,
+        b"FIX",
+        b"Fixture",
+        b"",
+        b"",
+        ctx,
     );
     destroy(mint_standard(&mut currency, treasury_cap));
     abort
@@ -167,8 +285,14 @@ fun wrong_decimals_rejected() {
 fun wrong_name_rejected() {
     let ctx = &mut tx_context::dummy();
     let mut registry = fixture::registry(ctx);
-    let (mut currency, treasury_cap) = fixture::locked(
-        &mut registry, 6, b"FIX".to_string(), b"Other".to_string(), b"".to_string(), b"".to_string(), ctx,
+    let (mut currency, treasury_cap) = locked_with(
+        &mut registry,
+        6,
+        b"FIX",
+        b"Other",
+        b"",
+        b"",
+        ctx,
     );
     destroy(mint_standard(&mut currency, treasury_cap));
     abort
@@ -178,8 +302,14 @@ fun wrong_name_rejected() {
 fun wrong_symbol_rejected() {
     let ctx = &mut tx_context::dummy();
     let mut registry = fixture::registry(ctx);
-    let (mut currency, treasury_cap) = fixture::locked(
-        &mut registry, 6, b"OTHER".to_string(), b"Fixture".to_string(), b"".to_string(), b"".to_string(), ctx,
+    let (mut currency, treasury_cap) = locked_with(
+        &mut registry,
+        6,
+        b"OTHER",
+        b"Fixture",
+        b"",
+        b"",
+        ctx,
     );
     destroy(mint_standard(&mut currency, treasury_cap));
     abort
@@ -189,8 +319,14 @@ fun wrong_symbol_rejected() {
 fun wrong_description_rejected() {
     let ctx = &mut tx_context::dummy();
     let mut registry = fixture::registry(ctx);
-    let (mut currency, treasury_cap) = fixture::locked(
-        &mut registry, 6, b"FIX".to_string(), b"Fixture".to_string(), b"About".to_string(), b"".to_string(), ctx,
+    let (mut currency, treasury_cap) = locked_with(
+        &mut registry,
+        6,
+        b"FIX",
+        b"Fixture",
+        b"About",
+        b"",
+        ctx,
     );
     destroy(mint_standard(&mut currency, treasury_cap));
     abort
@@ -200,8 +336,14 @@ fun wrong_description_rejected() {
 fun wrong_icon_rejected() {
     let ctx = &mut tx_context::dummy();
     let mut registry = fixture::registry(ctx);
-    let (mut currency, treasury_cap) = fixture::locked(
-        &mut registry, 6, b"FIX".to_string(), b"Fixture".to_string(), b"".to_string(), b"https://example.com/i.png".to_string(), ctx,
+    let (mut currency, treasury_cap) = locked_with(
+        &mut registry,
+        6,
+        b"FIX",
+        b"Fixture",
+        b"",
+        ICON_URL,
+        ctx,
     );
     destroy(mint_standard(&mut currency, treasury_cap));
     abort
@@ -214,7 +356,9 @@ fun foreign_treasury_cap_rejected() {
     let mut other_registry = fixture::registry(ctx);
     let (mut currency, treasury_cap) = standard(&mut registry, ctx);
     let (other_currency, other_treasury_cap) = standard(&mut other_registry, ctx);
-    destroy(other_currency); destroy(other_registry); destroy(treasury_cap);
+    destroy(other_currency);
+    destroy(other_registry);
+    destroy(treasury_cap);
     destroy(mint_standard(&mut currency, other_treasury_cap));
     abort
 }
