@@ -1,8 +1,7 @@
 // Copyright (c) Miso Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-/// Test currencies. `coin_registry::new_currency` must be called from the
-/// type's own module; each test builds its own registry.
+/// Test currencies; `coin_registry::new_currency` must be called from the type's own module.
 #[test_only]
 module share::fixture;
 
@@ -10,17 +9,14 @@ use std::string::String;
 use sui::coin::{TreasuryCap, DenyCapV2};
 use sui::coin_registry::{Self, Currency, CoinRegistry, MetadataCap};
 
-/// The expected type in most tests: `share::fixture::Fixture`.
 public struct Fixture has key { id: UID }
-/// A generic type, for the exact-name check.
 public struct Generic<phantom X> has key { id: UID }
 
-/// A registry for one test; the dummy context's sender is the system address.
+/// The dummy context's sender is the system address.
 public fun registry(ctx: &mut TxContext): CoinRegistry {
     coin_registry::create_coin_data_registry_for_testing(ctx)
 }
 
-/// `Fixture` with the given metadata and its metadata cap deleted.
 public fun locked(
     registry: &mut CoinRegistry,
     decimals: u8,
@@ -47,7 +43,6 @@ public fun locked(
     (currency, treasury_cap)
 }
 
-/// `Fixture` with the standard test metadata, metadata cap kept.
 public fun unlocked(
     registry: &mut CoinRegistry,
     ctx: &mut TxContext,
@@ -65,7 +60,6 @@ public fun unlocked(
     (currency, treasury_cap, metadata_cap)
 }
 
-/// Regulated `Fixture` with the standard test metadata.
 public fun regulated(
     registry: &mut CoinRegistry,
     ctx: &mut TxContext,

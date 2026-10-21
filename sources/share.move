@@ -1,11 +1,8 @@
 // Copyright (c) Miso Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-/// Canonical fixed-supply share coins.
-///
-/// `mint` checks a freshly registered currency against a protocol's exact
-/// type, metadata and supply, mints the whole supply and fixes it by
-/// consuming the treasury cap, so a currency can be minted only once.
+/// Canonical fixed-supply share coins. `mint` consumes the treasury cap, so a
+/// currency can be minted only once.
 module share::share;
 
 // === Imports ===
@@ -33,10 +30,8 @@ const EZeroSupply: u64 = 10;
 
 // === Public Functions ===
 
-/// Mints `supply` of `T` and fixes it. `T` must be exactly
-/// `<package>::<module_name>::<datatype_name>` with the given metadata, its
-/// metadata cap deleted, unregulated, with nothing minted. Checks abort in the
-/// order documented in the README, starting with `EZeroSupply`.
+/// `T` must be exactly `<package>::<module_name>::<datatype_name>`. Checks abort
+/// in the order documented in the README.
 public fun mint<T: key>(
     currency: &mut Currency<T>,
     mut treasury_cap: TreasuryCap<T>,

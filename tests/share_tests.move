@@ -16,8 +16,6 @@ use share::share;
 const SUPPLY: u64 = 100_000_000_000_000;
 const ICON_URL: vector<u8> = b"https://example.com/i.png";
 
-/// Mints with the standard type, decimals, symbol and name, and the given
-/// description, icon and supply.
 fun mint_with(
     currency: &mut Currency<Fixture>,
     treasury_cap: TreasuryCap<Fixture>,
@@ -39,7 +37,6 @@ fun mint_with(
     )
 }
 
-/// Mints with the standard expectations.
 fun mint_standard(
     currency: &mut Currency<Fixture>,
     treasury_cap: TreasuryCap<Fixture>,
@@ -47,7 +44,6 @@ fun mint_standard(
     mint_with(currency, treasury_cap, b"".to_string(), b"".to_string(), SUPPLY)
 }
 
-/// Mints with the standard metadata and the given module and datatype names.
 fun mint_named(
     currency: &mut Currency<Fixture>,
     treasury_cap: TreasuryCap<Fixture>,
@@ -68,7 +64,6 @@ fun mint_named(
     )
 }
 
-/// A locked `Fixture` with the standard metadata.
 fun standard(
     registry: &mut CoinRegistry,
     ctx: &mut TxContext,
@@ -76,7 +71,6 @@ fun standard(
     locked_with(registry, 6, b"FIX", b"Fixture", b"", b"", ctx)
 }
 
-/// A locked `Fixture` with the given metadata.
 fun locked_with(
     registry: &mut CoinRegistry,
     decimals: u8,
@@ -97,7 +91,6 @@ fun locked_with(
     )
 }
 
-/// Mints `supply` and checks it is minted and fixed.
 fun mint_and_check(
     mut currency: Currency<Fixture>,
     treasury_cap: TreasuryCap<Fixture>,
@@ -220,7 +213,6 @@ fun generic_type_never_matches() {
     assert!(share::is_type_for_testing<Fixture>(b"fixture", b"Fixture"));
 }
 
-/// `::` inside either name never splits into a matching path.
 #[test]
 fun injected_separator_never_matches() {
     assert!(!share::is_type_for_testing<Fixture>(b"fixture::Fixture", b""));
@@ -236,7 +228,6 @@ fun empty_names_never_match() {
     assert!(!share::is_type_for_testing<Fixture>(b"", b""));
 }
 
-/// The module name distinguishes types with the same datatype name.
 #[test]
 fun same_datatype_in_other_module_never_matches() {
     assert!(!share::is_type_for_testing<other_fixture::Fixture>(b"fixture", b"Fixture"));
