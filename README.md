@@ -2,7 +2,7 @@
 
 Canonical fixed-supply share coins for Sui Move.
 
-A share coin is an ordinary `Coin<T>` whose type, metadata and supply are pinned
+A share coin is an ordinary `Coin<Share>` whose type, metadata and supply are pinned
 by the protocol that uses it. `mint` checks a freshly registered currency against
 the protocol's expected values, mints the whole supply and fixes it. Coins minted
 with the same values are identical apart from their package address. `miso_music` uses
@@ -12,7 +12,7 @@ its coin passed `mint`.
 ## Usage
 
 ```move
-let shares: Balance<T> = share::mint(
+let shares: Balance<Share> = share::mint(
     &mut currency,
     treasury_cap,
     b"composition_share",             // module
@@ -28,12 +28,12 @@ let shares: Balance<T> = share::mint(
 
 ## Guarantees
 
-`mint<T: key>` aborts unless, in this order:
+`mint<Share: key>` aborts unless, in this order:
 
 | Check | Error |
 |---|---|
 | The supply is positive | `EZeroSupply` |
-| `T` is exactly `<package>::<module>::<datatype>` (no type arguments when `<datatype>` contains no `<`) | `EInvalidType` |
+| `Share` is exactly `<package>::<module>::<datatype>` (no type arguments when `<datatype>` contains no `<`) | `EInvalidType` |
 | The metadata cap is deleted | `EMetadataNotLocked` |
 | The currency is unregulated | `ERegulatedCurrency` |
 | Decimals, name, symbol, description and icon URL equal the expected values | `EInvalidDecimals` … `EInvalidIconUrl` |
@@ -56,18 +56,18 @@ treasury cap until they mint.
 
 ## Creating a conforming currency
 
-`coin_registry::new_currency<T>` must be called from `T`'s own module, so each
+`coin_registry::new_currency<Share>` must be called from `Share`'s own module, so each
 share type lives in a small package of its own. Register the currency with the
 expected metadata, delete the metadata cap (`finalize_and_delete_metadata_cap`)
 and pass the treasury cap to the protocol that calls `mint`.
 
 ## Framework assumptions
 
-Re-verify on framework changes: `new_currency` can only be called from `T`'s
+Re-verify on framework changes: `new_currency` can only be called from `Share`'s
 module and once per type; one-time witnesses have only `drop`. The
-`ETreasuryMismatch` check is defense in depth: for `T: key` only one
-`TreasuryCap<T>` can exist (`coin::new_treasury_cap` is package-only and the
-legacy constructors need `T: drop`), so it guards against future framework
+`ETreasuryMismatch` check is defense in depth: for `Share: key` only one
+`TreasuryCap<Share>` can exist (`coin::new_treasury_cap` is package-only and the
+legacy constructors need `Share: drop`), so it guards against future framework
 changes.
 
 ## Build and test

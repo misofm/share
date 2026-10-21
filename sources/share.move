@@ -30,11 +30,11 @@ const EZeroSupply: u64 = 10;
 
 // === Public Functions ===
 
-/// `T` must be exactly `<package>::<module_name>::<datatype_name>`. Checks abort
+/// `Share` must be exactly `<package>::<module_name>::<datatype_name>`. Checks abort
 /// in the order documented in the README.
-public fun mint<T: key>(
-    currency: &mut Currency<T>,
-    mut treasury_cap: TreasuryCap<T>,
+public fun mint<Share: key>(
+    currency: &mut Currency<Share>,
+    mut treasury_cap: TreasuryCap<Share>,
     module_name: vector<u8>,
     datatype_name: vector<u8>,
     decimals: u8,
@@ -43,9 +43,9 @@ public fun mint<T: key>(
     description: String,
     icon_url: String,
     supply: u64,
-): Balance<T> {
+): Balance<Share> {
     assert!(supply > 0, EZeroSupply);
-    assert!(is_type<T>(module_name, datatype_name), EInvalidType);
+    assert!(is_type<Share>(module_name, datatype_name), EInvalidType);
     assert!(currency.is_metadata_cap_deleted(), EMetadataNotLocked);
     assert!(!currency.is_regulated(), ERegulatedCurrency);
     assert!(currency.decimals() == decimals, EInvalidDecimals);
@@ -68,8 +68,8 @@ public fun mint<T: key>(
 
 /// True only for exactly `<address>::<module_name>::<datatype_name>`, which
 /// excludes type arguments when `datatype_name` contains no `<`.
-fun is_type<T: key>(module_name: vector<u8>, datatype_name: vector<u8>): bool {
-    let type_name = type_name::with_defining_ids<T>();
+fun is_type<Share: key>(module_name: vector<u8>, datatype_name: vector<u8>): bool {
+    let type_name = type_name::with_defining_ids<Share>();
     let mut expected = type_name.address_string().into_bytes();
     expected.append(b"::");
     expected.append(module_name);
@@ -81,9 +81,9 @@ fun is_type<T: key>(module_name: vector<u8>, datatype_name: vector<u8>): bool {
 // === Test Functions ===
 
 #[test_only]
-public fun is_type_for_testing<T: key>(
+public fun is_type_for_testing<Share: key>(
     module_name: vector<u8>,
     datatype_name: vector<u8>,
 ): bool {
-    is_type<T>(module_name, datatype_name)
+    is_type<Share>(module_name, datatype_name)
 }

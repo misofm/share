@@ -10,7 +10,7 @@ use sui::coin::{TreasuryCap, DenyCapV2};
 use sui::coin_registry::{Self, Currency, CoinRegistry, MetadataCap};
 
 public struct Fixture has key { id: UID }
-public struct Generic<phantom X> has key { id: UID }
+public struct Generic<phantom Inner> has key { id: UID }
 
 /// The dummy context's sender is the system address.
 public fun registry(ctx: &mut TxContext): CoinRegistry {
