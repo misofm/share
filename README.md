@@ -5,7 +5,7 @@ Canonical fixed-supply share coins for Sui Move.
 A share coin is an ordinary `Coin<T>` whose type, metadata and supply are pinned
 by the protocol that uses it. `mint` checks a freshly registered currency against
 the protocol's expected values, mints the whole supply and fixes it. Coins minted
-with the same values are identical apart from their package address. MusicOS uses
+with the same values are identical apart from their package address. `miso_music` uses
 this for composition and recording shares, and treats a work object as proof that
 its coin passed `mint`.
 
