@@ -1,7 +1,6 @@
 // Copyright (c) Miso Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-/// Test currencies; `coin_registry::new_currency` must be called from the type's own module.
 #[test_only]
 module share::fixture;
 
@@ -12,7 +11,6 @@ use sui::coin_registry::{Self, Currency, CoinRegistry, MetadataCap};
 public struct Fixture has key { id: UID }
 public struct Generic<phantom Inner> has key { id: UID }
 
-/// The dummy context's sender is the system address.
 public fun registry(ctx: &mut TxContext): CoinRegistry {
     coin_registry::create_coin_data_registry_for_testing(ctx)
 }

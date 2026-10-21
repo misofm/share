@@ -159,8 +159,6 @@ fun expected_description_and_icon_accepted() {
     destroy(registry);
 }
 
-/// Minting then burning back to zero leaves nothing outstanding, so `mint`
-/// still produces exactly the requested supply.
 #[test]
 fun mint_then_burn_is_benign() {
     let ctx = &mut tx_context::dummy();

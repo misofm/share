@@ -1,8 +1,6 @@
 // Copyright (c) Miso Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-/// Canonical fixed-supply share coins. `mint` consumes the treasury cap, so a
-/// currency can be minted only once.
 module share::share;
 
 // === Imports ===
@@ -30,8 +28,6 @@ const EZeroSupply: u64 = 10;
 
 // === Public Functions ===
 
-/// `Share` must be exactly `<package>::<module_name>::<datatype_name>`. Checks abort
-/// in the order documented in the README.
 public fun mint<Share: key>(
     currency: &mut Currency<Share>,
     mut treasury_cap: TreasuryCap<Share>,
@@ -66,8 +62,6 @@ public fun mint<Share: key>(
 
 // === Private Functions ===
 
-/// True only for exactly `<address>::<module_name>::<datatype_name>`, which
-/// excludes type arguments when `datatype_name` contains no `<`.
 fun is_type<Share: key>(module_name: vector<u8>, datatype_name: vector<u8>): bool {
     let type_name = type_name::with_defining_ids<Share>();
     let mut expected = type_name.address_string().into_bytes();
